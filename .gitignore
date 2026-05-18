@@ -1,0 +1,51 @@
+# Python environment
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE and OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Sensitive environment configuration
+.env
+
+# SQLite and Prisma local databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+data/*.db
+prisma/migrations/
+
+# AutoDock Vina and simulated molecular docking temporary files
+data/dock_tmp/
+*.pdbqt
+*.log
+!scripts/*.py
+
+# Generated outputs
+output/*.pdf
+output/*.json
+output/temp_img/
+
+# Heavy dynamics and local vector stores
+data/docked_poses/
+data/chroma/
+data/evidence/
+scratch/
+
+# MLflow cache and tracking files
+mlruns/
+
+# Large AI Model binaries
+*.gguf
+
+# LinkedIn post drafts
+docs/linkedin_post.md
+

@@ -1,0 +1,97 @@
+# Catálogo de Indicaciones Terapéuticas y Dianas Científicas (DrugAgent-Local)
+# Este catálogo contiene las dianas farmacológicas legítimas configuradas con sus respectivos
+# identificadores PDB, descriptores clínicos, avisos legales (disclaimers) y coordenadas de docking.
+
+oncology_lung_egfr:
+  display_name: "Oncología: Cáncer de Pulmón (NSCLC) - Inhibición de EGFR"
+  target: "EGFR"
+  pdb_id: "4HJO"
+  receptor_path: "data/receptors/4HJO_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Esta simulación produce candidatos computacionales preliminares frente a EGFR (Cáncer de Pulmón). No representa indicación clínica ni de dosificación médica."
+  docking_params:
+    center_x: 21.0
+    center_y: 11.5
+    center_z: -0.5
+    size_x: 20.0
+    size_y: 20.0
+    size_z: 20.0
+  planner_prompt: "Focus on designing molecules that act as EGFR tyrosine kinase inhibitors, matching a pharmacophore with hydrogen-bond donors/acceptors for the hinge region (Met793) and hydrophobic chains to fit the pocket."
+
+metabolic_diabetes_dpp4:
+  display_name: "Metabólica: Diabetes Tipo 2 - Inhibición de DPP-4"
+  target: "DPP4"
+  pdb_id: "3HAJ"
+  receptor_path: "data/receptors/3HAJ_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Esta simulación estima afinidad frente a DPP-4 para Diabetes Tipo 2. Todos los hits son meramente experimentales en fase silico."
+  docking_params:
+    center_x: 39.5
+    center_y: 50.1
+    center_z: 32.8
+    size_x: 18.0
+    size_y: 18.0
+    size_z: 18.0
+  planner_prompt: "Focus on designing compounds that mimic DPP-4 inhibitors (gliptins) featuring an amino group that interacts with the active site Glu205/Glu206 and a hydrophobic group to occupy the S1 pocket."
+
+infectious_covid_mpro:
+  display_name: "Infecciosas: SARS-CoV-2 Mpro proteasa - Inhibición de Proteasa"
+  target: "MPRO"
+  pdb_id: "6LU7"
+  receptor_path: "data/receptors/6LU7_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Simulación computacional de unión frente a la proteasa principal (Mpro) de SARS-CoV-2. Los resultados requieren validación experimental in vitro."
+  docking_params:
+    center_x: -10.5
+    center_y: 12.3
+    center_z: 68.0
+    size_x: 22.0
+    size_y: 22.0
+    size_z: 22.0
+  planner_prompt: "Focus on designing peptidomimetic or non-peptidyl inhibitors targeting the catalytic dyad (Cys145 and His41) of the SARS-CoV-2 main protease (Mpro)."
+
+# ── Virus de alta prioridad en I+D global (PDB + caja desde ligando nativo o proteína) ─────────────
+# DrugAgent NO consulta bases regulatorias en vivo: el estado de vacunas/antivirales aprobados cambia.
+# Estas misiones son simulación computacional de unión a un blanco estructural público, no “cura” clínica.
+
+infectious_dengue_ns3:
+  display_name: "Infecciosas: Virus del dengue — NS3 proteasa (I+D antiviral in silico)"
+  target: "DENV_NS3"
+  pdb_id: "2M9P"
+  receptor_path: "data/receptors/2M9P_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Simulación in silico frente a NS3 proteasa del dengue (PDB 2M9P, estructura NMR con ligando). No indica ausencia de vacunas o políticas de salud pública; no sustituye decisiones clínicas. Solo investigación computacional preclínica."
+  docking_params:
+    center_x: 10.96
+    center_y: 6.06
+    center_z: 10.08
+    size_x: 22.0
+    size_y: 20.5
+    size_z: 25.0
+  planner_prompt: "Design competitive inhibitors of dengue NS3 protease active site as defined by the co-crystal/NMR ligand environment; balance protease selectivity vs human proteases and drug-like properties."
+
+infectious_zika_ns2b_ns3:
+  display_name: "Infecciosas: Virus Zika — NS2B-NS3 proteasa (I+D antiviral)"
+  target: "ZIKV_NS3"
+  pdb_id: "7VLI"
+  receptor_path: "data/receptors/7VLI_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Simulación in silico frente a NS2B-NS3 de Zika (PDB 7VLI con ligando de referencia). No es vacuna ni terapia aprobada; validación experimental obligatoria."
+  docking_params:
+    center_x: -5.42
+    center_y: 5.26
+    center_z: -14.99
+    size_x: 18.0
+    size_y: 18.0
+    size_z: 21.0
+  planner_prompt: "Design competitive inhibitors of Zika NS2B-NS3 protease pocket occupied by the co-crystal ligand; optimize for selectivity vs host proteases and favorable ADMET."
+
+infectious_rsv_fusion:
+  display_name: "Infecciosas: VRS (RSV) — Proteína F (fusion), sitio con ligando pequeño (I+D)"
+  target: "RSV_F"
+  pdb_id: "5C6B"
+  receptor_path: "data/receptors/5C6B_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Simulación in silico en sitio definido por HETATM del PDB 5C6B (RSV F). Existen biológicos aprobados para algunas poblaciones; este pipeline no los modela. Solo candidatos computacionales."
+  docking_params:
+    center_x: 42.59
+    center_y: 18.6
+    center_z: 25.97
+    size_x: 16.0
+    size_y: 16.0
+    size_z: 16.0
+  planner_prompt: "Design small-molecule fusion inhibitors or entry blockers consistent with the pocket geometry near the co-crystal ligand; consider prefusion vs postfusion state limitations of a single PDB."

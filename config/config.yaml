@@ -1,0 +1,128 @@
+target: EGFR
+pdb_id: 4HJO
+
+# Parámetros de búsqueda del sitio de binding (EGFR kinase domain)
+docking:
+  center_x: 24.77
+  center_y: 9.19
+  center_z: 0.00
+  size_x: 20.0
+  size_y: 20.0
+  size_z: 20.0
+  exhaustiveness: 4
+  num_modes: 10
+  energy_range: 3.0
+
+# Límites de recursos
+resources:
+  max_ram_pct: 80
+  max_vram_pct: 80
+  batch_size: 32
+  max_molecules_per_iteration: 100
+
+# Pipeline
+pipeline:
+  iterations: 50
+  top_k_for_md: 5         # Solo top 5 van a MD
+  lipinski_filter: true
+  qsar_filter: true
+  pains_filter: true
+  brenk_filter: true
+
+# Groq API
+llm:
+  provider: groq
+  model: llama-3.3-70b-versatile
+  temperature: 0.1
+  max_tokens: 4096
+  fallback_model: llama-3.1-8b-instant  # Para rate limit
+
+# Thresholds de calidad
+thresholds:
+  min_docking_score: -7.0   # kcal/mol (mejor = más negativo)
+  max_mw: 500
+  max_logp: 5.0
+  min_qed: 0.4
+  max_tpsa: 140.0
+  min_novelty_score: 0.7
+  max_toxicity: 0.5         # Umbral tolerado de toxicidad predicha local (ADMET)
+
+# Modo de docking: "auto" (detecta si vina.exe está), "real" (fuerza real), "mock" (fuerza mock)
+docking_mode: auto
+
+# Pesos de scoring para el cálculo del score final
+scoring_weights:
+  docking: 0.50
+  qed: 0.25
+  toxicity: 0.25
+  pains_penalty: 0.30
+  brenk_penalty: 0.10
+
+# Skills con bloques ```python en memory/skills/: solo se ejecutan si el stem del .md
+# está en esta lista (firma requerida: callable(batch_size: int, scaffolds: list) -> list[str] SMILES).
+# Lista vacía = ningún exec (máxima seguridad).
+skills:
+  exec_allowlist:
+    - diversity_enhancer_v4
+
+# Evidencia pública (ChEMBL API — recomendado). SQLite dump opcional en el futuro (CHEMBL_SQLITE_PATH).
+evidence:
+  enabled: true
+  mode: api
+  activity_limit: 50
+  cache_dir: data/evidence/cache
+  output_dir: data/evidence
+
+# MLflow Automation Telemetry
+mlflow:
+  enabled: true
+  tracking_uri: sqlite:///./data/mlflow.db
+  experiment_prefix: DrugAgent
+  log_every_iteration: true
+  log_artifacts: true
+  ui_port: 5000
+
+# Custom Prompts for Closed-loop Orchestrator
+prompts:
+  planner_prompt: |
+    En 2 oraciones: ¿Cuáles son las características clave que debe tener un inhibidor de {target}? Sé muy conciso y científico.
+  generator_prompt: |
+    Eres un experto en química computacional. Diseña {n} moléculas inhibidoras para la diana terapéutica: {target}.
+    MODO DE GENERACIÓN: {workflow_mode}.
+    
+    RESTRICCIONES ESTRICTAS:
+    1. Deben ser cadenas SMILES sintácticamente válidas (parseables por RDKit).
+    2. Deben cumplir la Regla de los 5 de Lipinski (Peso < 500, LogP < 5).
+    3. Evitar subestructuras tóxicas o reactivas (PAINS).
+    {optional_parent_or_scaffolds}
+    {memory_context_section}
+    Responde ÚNICAMENTE con un arreglo JSON válido, sin bloques de código Markdown ni texto adicional. Formato:
+    [
+      {{"smiles": "c1ccccc1"}},
+      {{"smiles": "CC(=O)O"}}
+    ]
+  reflector_prompt: |
+    Rol: Químico Medicinal Principal y Orquestador de DrugAgent.
+    Analiza la corrida actual de descubrimiento in silico para {target} (PDB: {target_pdb_id}).
+    
+    ESTADO DE LA CORRIDA:
+    - Iteración: {iteration}/{max_iterations}
+    - Total Candidatos Evaluados: {total_candidates}
+    - Mejor Afinidad Encontrada: {best_docking_score} kcal/mol
+    
+    CANDIDATOS RECIENTES EVALUADOS:
+    {candidates_data}
+    
+    ÚLTIMOS INSIGHTS REGISTRADOS EN MEMORIA VECTORIAL:
+    {memory_context}
+    
+    Tu tarea es:
+    1. Generar 1 Insight Crítico Científico (máximo 2 oraciones) indicando qué características químicas parecen mejorar la afinidad de docking o la solubilidad, o sugiriendo sustituyentes específicos (ej. introducir fluoruros, cambiar un aza-heterociclo).
+    2. Modificar o inyectar código Python dinámico para el generador ("skill") SI Y SOLO SI identificas un patrón recurrente de fallo (ej. violaciones de Lipinski, o docking débil). La skill debe ser una función en python que mute una molécula de forma inteligente.
+    
+    Responde estrictamente en formato JSON:
+    {{
+      "insight": "...",
+      "skill_code": "```python\n# Código opcional aquí para mutar o refinar cadenas SMILES si aplica\n```"
+    }}
+

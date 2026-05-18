@@ -1,0 +1,57 @@
+# Mapeo DrugAgent target_name → búsqueda ChEMBL / metadatos de evidencia pública.
+# Fuentes: ChEMBL (EBI), RCSB PDB. Revisar manualmente entradas nuevas.
+
+EGFR:
+  chembl_search: "EGFR"
+  chembl_target_id: "CHEMBL203"
+  gene_symbol: "EGFR"
+  notes: "Kinasa receptor tirosina humana (override CHEMBL203)."
+
+DPP4:
+  chembl_search: "DPP4"
+  chembl_target_id: "CHEMBL3813"
+  gene_symbol: "DPP4"
+  notes: "Gliptinas y química peptidomimética en ChEMBL."
+
+MPRO:
+  chembl_search: "SARS-CoV-2 main protease"
+  chembl_target_id: "CHEMBL4303835"
+  alt_searches: ["3C-like protease", "Mpro", "SARS-CoV-2 3CL protease"]
+  notes: "Proteasa principal SARS-CoV-2 (SINGLE PROTEIN); actividades post-2020."
+
+DENV_NS3:
+  chembl_search: "dengue virus NS3 protease"
+  chembl_target_id: "CHEMBL4296313"
+  alt_searches: ["flavivirus NS3"]
+  notes: "NS3 protease flavivirus/dengue; no confundir con ZIKV (CHEMBL4296325)."
+
+ZIKV_NS3:
+  chembl_search: "Zika NS3 protease"
+  chembl_target_id: "CHEMBL4296325"
+  alt_searches: ["Zika virus NS2B-NS3"]
+  notes: "NS3 protease Zika; entrada distinta de dengue en ChEMBL."
+
+RSV_F:
+  chembl_search: "RSV fusion protein"
+  chembl_target_id: "CHEMBL6105"
+  alt_searches: ["respiratory syncytial virus F"]
+  notes: "Proteína F; pocos small molecules vs datos biológicos."
+
+BACE1:
+  chembl_search: "BACE1"
+  chembl_target_id: "CHEMBL3297642"
+  gene_symbol: "BACE1"
+  notes: "Beta-secretase 1; CHEMBL482 legacy sin actividades en API."
+
+HIV1PR:
+  chembl_search: "HIV-1 protease"
+  chembl_target_id: "CHEMBL3638323"
+  alt_searches: ["HIV protease"]
+  notes: "HIV protease SINGLE PROTEIN."
+
+KRAS:
+  chembl_search: "KRAS G12C"
+  chembl_target_id: "CHEMBL2189121"
+  alt_searches: ["KRAS"]
+  gene_symbol: "KRAS"
+  notes: "GTPase KRas; mutantes G12C en sub-búsquedas separadas."

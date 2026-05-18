@@ -1,0 +1,91 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "sync"
+  recursive_type_depth = 5
+}
+
+model Run {
+  id             String      @id @default(uuid())
+  mlflow_run_id  String?     // Enlace a la telemetría de MLflow
+  target_name    String
+  target_pdb_id  String
+  start_time     DateTime    @default(now())
+  end_time       DateTime?
+  status         String      // "running", "completed", "failed"
+  max_iterations Int
+  docking_mode   String?     // "real" or "mock"
+  workflow_mode   String?     // "de_novo", "lead_opt", "admet_only"
+  therapeutic_area String?     // "oncology", "metabolic", "infectious"
+  indication_label String?     // e.g., "Cáncer de Pulmón (EGFR)"
+  parent_smiles   String?     // SMILES original para optimización
+  error_message   String?
+  duration_sec    Float?
+  config_snapshot String?
+  candidates     Candidate[]
+}
+
+model Candidate {
+  id                String   @id @default(uuid())
+  run_id            String
+  run               Run      @relation(fields: [run_id], references: [id])
+  
+  smiles            String
+  mol_id            String
+  iteration         Int
+  
+  // Físico-químicas
+  mw                Float
+  logp              Float
+  hbd               Int
+  hba               Int
+  tpsa              Float
+  qed               Float
+  
+  // Docking
+  docking_score     Float?
+  binding_affinity  Float?
+  
+  // Dinámica Molecular
+  md_rmsd           Float?
+  md_refined_score  Float?
+  
+  // ADMET
+  admet_toxicity    Float?
+  admet_solubility  String?
+  admet_absorption  Float?
+  
+  // Filtros
+  pains_alert       Boolean
+  brenk_alert       Boolean
+  passes_lipinski   Boolean
+  
+  // Scores combinados
+  sa_score          Float?
+  ligand_efficiency Float?
+  score_final       Float?
+  
+  status            String
+  
+  // Nuevas métricas y metadatos
+  tanimoto_parent      Float?
+  delta_docking_parent Float?
+  generation_source    String?
+  guardrail_passed     Boolean?
+  
+  created_at        DateTime @default(now())
+  
+  @@unique([run_id, smiles]) // Evitar duplicados por corrida
+}
+
+model Skill {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  content     String
+  created_at  DateTime @default(now())
+}
