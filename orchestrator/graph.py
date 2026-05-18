@@ -60,7 +60,7 @@ def output_node(state: AgentState) -> dict:
     """Nodo final: genera reporte y prepara para revisión humana."""
     top = state.get("top_candidates", [])
     print(f"\n{'='*60}")
-    print(f"🧬 DRUAGENT - RESULTADOS FINALES")
+    print(f"🧬 DRUGAGENT - RESULTADOS FINALES")
     print(f"{'='*60}")
     print(f"Target: {state.get('target_name', 'N/A')}")
     print(f"Iteraciones: {state.get('iteration', 0)}")

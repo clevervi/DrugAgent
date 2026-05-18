@@ -148,7 +148,7 @@ def run_agent_workflow():
         ]
     ).ask()
     
-    docking_mode = "mock" if "Simulación Hashing" in docking_mode_choice else "vina"
+    docking_mode = "mock" if "Simulación Hashing" in docking_mode_choice else "real"
     
     # Mostrar resumen
     clear_screen()
@@ -165,7 +165,7 @@ def run_agent_workflow():
     if parent_smiles:
         summary_table.add_row("SMILES Padre", parent_smiles)
     summary_table.add_row("Iteraciones del Loop", str(iterations))
-    summary_table.add_row("Simulador de Docking", "AutoDock Vina (Nativo Windows)" if docking_mode == "vina" else "Simulado Reproducible (MD5-mock)")
+    summary_table.add_row("Simulador de Docking", "AutoDock Vina (Nativo Windows)" if docking_mode == "real" else "Simulado Reproducible (QSAR-mock)")
     
     console.print(summary_table)
     

@@ -91,6 +91,13 @@ def generate_evidence_pack(
     cache_dir = Path(settings.get("cache_dir", "data/evidence/cache"))
     limit = int(settings.get("activity_limit", 50))
 
+    from utils.target_validation import resolve_target_pdb
+    resolved = resolve_target_pdb(target_name, target_pdb_id)
+    for w in resolved.warnings:
+        print(f"   [WARN] Evidencia: {w}")
+    target_name = resolved.target_name
+    target_pdb_id = resolved.pdb_id
+
     evidence_cfg = load_evidence_config_for_target(target_name)
     print(f"\n[Evidencia ChEMBL] Resolviendo target '{target_name}' (PDB {target_pdb_id})...")
 

@@ -79,6 +79,13 @@ if __name__ == "__main__":
             f"Por favor, verifique el ID del receptor e intente de nuevo."
         )
 
+    from utils.target_validation import resolve_target_pdb
+    resolved = resolve_target_pdb(args.target, args.pdb)
+    for w in resolved.warnings:
+        print(f"   [WARN] {w}")
+    args.target = resolved.target_name
+    args.pdb = resolved.pdb_id
+
     from orchestrator.graph import run_agent
     from orchestrator.db import db, init_db
     import json

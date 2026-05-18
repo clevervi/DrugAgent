@@ -77,6 +77,12 @@ def simulator_node(state: AgentState) -> dict:
     use_real_vina = False
     receptor_pdbqt = None
 
+    if docking_mode in ("vina", "real"):
+        docking_mode = "real"
+    elif docking_mode not in ("mock", "auto"):
+        print(f"   ⚠️  DOCKING_MODE desconocido '{docking_mode}'; usando auto")
+        docking_mode = "auto"
+
     if docking_mode == "mock":
         print("   ℹ️  Modo forzado por configuración: MOCK")
     elif docking_mode == "real":

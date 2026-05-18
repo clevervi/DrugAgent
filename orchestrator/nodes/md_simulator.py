@@ -1,7 +1,6 @@
 """
-MD Simulator Node
-Realiza validación de poses de Docking utilizando Dinámica Molecular (MD)
-con OpenMM o GROMACS. Incluye un fallback (Proxy Mode) para entornos sin CUDA.
+MD Simulator Node — proxy de estabilidad (no OpenMM/GROMACS).
+Ajusta scores con RMSD sintético determinista; etiquetar como in silico en informes.
 """
 from ..state import AgentState
 from utils.scoring import deterministic_noise

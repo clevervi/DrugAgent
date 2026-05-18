@@ -137,6 +137,13 @@ AUTONOMOUS_TARGET_POOL = [
         "therapeutic_area": "Oncología",
         "indication_label": "Mutación Oncogénica KRAS G12C",
         "workflow": "de_novo"
+    },
+    {
+        "target": "PD_L1",
+        "pdb_id": "3K33",
+        "therapeutic_area": "Oncología",
+        "indication_label": "PD-L1 (CD274) — inhibición in silico",
+        "workflow": "de_novo"
     }
 ]
 
@@ -204,14 +211,15 @@ Devuelve un JSON estrictamente estructurado sin explicaciones adicionales:
                 justification = normalized_data.get("justification", "Prioridad mundial de salud")
                 
                 if target and pdb_id and area and indication:
-                    result = {
+                    from utils.target_validation import validate_mission_dict
+                    result = validate_mission_dict({
                         "target": str(target).strip().upper(),
                         "pdb_id": str(pdb_id).strip().upper(),
                         "therapeutic_area": str(area).strip(),
                         "indication_label": str(indication).strip(),
                         "workflow": str(workflow).strip(),
-                        "justification": str(justification).strip()
-                    }
+                        "justification": str(justification).strip(),
+                    })
                     if console:
                         console.print("\n[bold cyan]🧠 [Decisión Autónoma LLM Local]:[/bold cyan]")
                         console.print(f"   [yellow]Diana:[/yellow]         {result['target']} (PDB: {result['pdb_id']})")
@@ -283,7 +291,12 @@ Devuelve un JSON estrictamente estructurado sin explicaciones adicionales:
             data = json.loads(res_text[start:end+1])
             # Validar campos básicos
             if all(k in data for k in ["target", "pdb_id", "therapeutic_area", "indication_label"]):
-                data["pdb_id"] = str(data["pdb_id"]).strip().upper()
+                from utils.target_validation import validate_mission_dict
+                data = validate_mission_dict({
+                    **data,
+                    "target": str(data["target"]).strip().upper(),
+                    "pdb_id": str(data["pdb_id"]).strip().upper(),
+                })
                 if console:
                     console.print("\n[bold cyan]🧠 [Decisión Autónoma LLM]:[/bold cyan]")
                     console.print(f"   [yellow]Diana:[/yellow]         {data['target']} (PDB: {data['pdb_id']})")
@@ -317,7 +330,12 @@ Devuelve un JSON estrictamente estructurado sin explicaciones adicionales:
                 if start != -1 and end != -1:
                     data = json.loads(res_text[start:end+1])
                     if all(k in data for k in ["target", "pdb_id", "therapeutic_area", "indication_label"]):
-                        data["pdb_id"] = str(data["pdb_id"]).strip().upper()
+                        from utils.target_validation import validate_mission_dict
+                        data = validate_mission_dict({
+                            **data,
+                            "target": str(data["target"]).strip().upper(),
+                            "pdb_id": str(data["pdb_id"]).strip().upper(),
+                        })
                         if console:
                             console.print("\n[bold cyan]🧠 [Decisión Autónoma LLM (GEMINI FALLBACK)]:[/bold cyan]")
                             console.print(f"   [yellow]Diana:[/yellow]         {data['target']} (PDB: {data['pdb_id']})")
@@ -543,11 +561,11 @@ def run_infinite_loop():
                     n_bt = len(bt_list)
                     if n_bt > 0:
                         if console:
-                            console.print(f"\n[bold gold3]🏆 TOTAL DE CLINICAL BREAKTHROUGHS HISTÓRICOS DESCUBIERTOS: {n_bt} 🚨[/bold gold3]")
+                            console.print(f"\n[bold gold3]🏆 Total de candidatos in silico de alta prioridad registrados: {n_bt}[/bold gold3]")
                             latest = bt_list[-1]
                             console.print(f"   [yellow]Último avance:[/yellow] {latest['target_name']} ({latest['target_pdb_id']}) para {latest['indication_label']}")
                         else:
-                            print(f"\n🏆 TOTAL DE CLINICAL BREAKTHROUGHS HISTÓRICOS DESCUBIERTOS: {n_bt} 🚨")
+                            print(f"\n🏆 Total de candidatos in silico de alta prioridad registrados: {n_bt}")
                             latest = bt_list[-1]
                             print(f"   Último avance: {latest['target_name']} ({latest['target_pdb_id']}) para {latest['indication_label']}")
             except Exception:

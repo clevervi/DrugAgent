@@ -29,7 +29,8 @@ pipeline:
   pains_filter: true
   brenk_filter: true
 
-# Groq API
+# LLM: para demo local use LOCAL_LLM_BASE_URL en .env (ver INSTALL_WINDOWS.md).
+# Groq/Gemini son opcionales si no hay Ollama.
 llm:
   provider: groq
   model: llama-3.3-70b-versatile

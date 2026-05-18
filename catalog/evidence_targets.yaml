@@ -55,3 +55,9 @@ KRAS:
   alt_searches: ["KRAS"]
   gene_symbol: "KRAS"
   notes: "GTPase KRas; mutantes G12C en sub-búsquedas separadas."
+
+PD_L1:
+  chembl_search: "PD-L1"
+  chembl_target_id: "CHEMBL4523993"
+  alt_searches: ["PDL1", "CD274"]
+  notes: "PD-L1 (CD274); muchas actividades son ensayos PD-1/PD-L1, no small molecule directo."

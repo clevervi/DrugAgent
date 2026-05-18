@@ -47,7 +47,7 @@ def check_and_register_breakthrough(
     if not smiles:
         return False
 
-    # 2. Criterios científicos para avance/cura
+    # 2. Criterios in silico para candidato de alta prioridad (no implica actividad clínica)
     # Score de Docking altamente favorable (menor a -8.0 kcal/mol es excelente afinidad física)
     # Si es mock, requerimos mejor de -8.2. Si es real, mejor de -8.0
     status_dock = candidate.get("status", "")
@@ -103,11 +103,12 @@ def check_and_register_breakthrough(
         mw = candidate.get("mw", 0.0)
         logp = candidate.get("logp", 0.0)
         
+        docking_note = "docking real (Vina)" if is_real_dock else "score in silico (mock o proxy)"
         explanation = (
-            f"El candidato presenta una afinidad de acoplamiento de {docking_score} kcal/mol frente a {target_name} ({target_pdb_id}), "
-            f"con una estabilidad estructural óptima y un perfil farmacocinético sumamente balanceado (QED={qed:.3f}, Tox={toxicity:.2f}). "
-            f"No presenta alertas de subestructuras reactivas (PAINS) y cumple las Reglas de Lipinski (Peso={mw:.1f} Da, LogP={logp:.2f}), "
-            f"lo que le otorga una alta probabilidad de biodisponibilidad oral y viabilidad clínica como hit de descubrimiento."
+            f"Candidato prioritario *in silico* ({docking_note}): afinidad estimada {docking_score} kcal/mol "
+            f"frente a {target_name} ({target_pdb_id}). QED={qed:.3f}, tox proxy={toxicity:.2f}, "
+            f"sin alertas PAINS, Lipinski favorable (MW={mw:.1f}, LogP={logp:.2f}). "
+            f"Requiere validación experimental (ensayo enzimático/celular); no es indicación clínica."
         )
 
         entry = {
@@ -141,7 +142,7 @@ def check_and_register_breakthrough(
         # Imprimir alerta gigante
         if HAS_RICH:
             alert_text = Text()
-            alert_text.append("\n🌟 HIGH-AFFINITY SCIENTIFIC LEAD / BREAKTHROUGH FOUND! 🌟\n\n", style="bold yellow")
+            alert_text.append("\n🌟 CANDIDATO IN SILICO DE ALTA PRIORIDAD 🌟\n\n", style="bold yellow")
             alert_text.append("🎯 Target Proteico:  ", style="bold cyan")
             alert_text.append(f"{target_name} ({target_pdb_id})\n", style="bold white")
             alert_text.append("🧬 Indicación:       ", style="bold cyan")
@@ -152,7 +153,7 @@ def check_and_register_breakthrough(
             alert_text.append("📊 Métricas de Viabilidad:\n", style="bold magenta")
             alert_text.append(f"   • Docking Score:   {docking_score} kcal/mol\n", style="bold green" if docking_score <= -8.0 else "bold yellow")
             if md_score is not None:
-                alert_text.append(f"   • Molecular Dynamics (RMSD): {md_score:.2f} kcal/mol\n", style="bold green")
+                alert_text.append(f"   • Estabilidad proxy (MD): {md_score:.2f} kcal/mol refinado\n", style="bold green")
             alert_text.append(f"   • Similaridad a Fármaco (QED): {qed:.3f}\n", style="bold green" if qed >= 0.72 else "bold yellow")
             alert_text.append(f"   • Toxicidad ADMET: {toxicity:.3f} (Bajo Riesgo)\n\n", style="bold green")
             
@@ -162,14 +163,14 @@ def check_and_register_breakthrough(
             
             panel = Panel(
                 alert_text,
-                title="[bold red]🚨 DISCOVERY BREAKTHROUGH ALERT 🚨[/bold red]",
+                title="[bold yellow]Candidato prioritario in silico[/bold yellow]",
                 border_style="bold yellow",
                 expand=False
             )
             console.print(panel)
         else:
             print("\n" + "="*80)
-            print("🚨 CRITICAL SCIENTIFIC BREAKTHROUGH / CANDIDATO DE ALTA AFINIDAD DETECTADO! 🚨")
+            print("CANDIDATO IN SILICO DE ALTA PRIORIDAD (requiere validacion experimental)")
             print("="*80)
             print(f"🎯 Target:      {target_name} ({target_pdb_id})")
             print(f"🧬 Indicación:  {indication_label} | Área: {therapeutic_area}")

@@ -1,6 +1,6 @@
 """
-Nodo Generator: Genera moléculas candidatas usando RDKit + REINVENT4.
-En el MVP usamos scaffold hopping con RDKit y filtros Lipinski.
+Nodo Generator: moléculas candidatas vía RDKit (scaffold hopping / mutación)
+y opcionalmente LLM local o cloud. REINVENT4 no está integrado en runtime.
 """
 import random
 import uuid

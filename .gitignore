@@ -37,7 +37,11 @@ output/temp_img/
 # Heavy dynamics and local vector stores
 data/docked_poses/
 data/chroma/
-data/evidence/
+# Evidencia por corrida (local); conservar solo ejemplos manual_* en git
+data/evidence/*
+!data/evidence/manual_*/
+!data/evidence/manual_**/
+data/evidence/cache/
 scratch/
 
 # MLflow cache and tracking files

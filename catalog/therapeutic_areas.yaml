@@ -95,3 +95,33 @@ infectious_rsv_fusion:
     size_y: 16.0
     size_z: 16.0
   planner_prompt: "Design small-molecule fusion inhibitors or entry blockers consistent with the pocket geometry near the co-crystal ligand; consider prefusion vs postfusion state limitations of a single PDB."
+
+oncology_kras_g12c:
+  display_name: "Oncología: KRAS G12C — inhibidores covalentes (I+D in silico)"
+  target: "KRAS"
+  pdb_id: "6VXX"
+  receptor_path: "data/receptors/6VXX_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Simulación frente a KRAS G12C (PDB 6VXX). No sustituye ensayos celulares ni decisiones clínicas; mutación G12D requiere otro contexto estructural."
+  docking_params:
+    center_x: 10.5
+    center_y: 12.0
+    center_z: 5.0
+    size_x: 22.0
+    size_y: 22.0
+    size_z: 22.0
+  planner_prompt: "Design covalent or switch-II pocket inhibitors consistent with KRAS G12C structural biology; prioritize drug-like warheads and selectivity vs wild-type KRAS."
+
+oncology_pd_l1:
+  display_name: "Oncología: PD-L1 (CD274) — inhibidores de interacción inmune (I+D in silico)"
+  target: "PD_L1"
+  pdb_id: "3K33"
+  receptor_path: "data/receptors/3K33_receptor.pdbqt"
+  disclaimer: "ADVERTENCIA: Simulación in silico en PD-L1 (PDB 3K33). Muchos fármacos aprobados son anticuerpos; los hits aquí son small-molecule computacionales."
+  docking_params:
+    center_x: 52.0
+    center_y: 14.0
+    center_z: 43.0
+    size_x: 20.0
+    size_y: 20.0
+    size_z: 20.0
+  planner_prompt: "Design small molecules that may modulate the PD-L1 surface pocket or adjacent grooves; note assay context (protein-protein vs direct binding) when interpreting scores."

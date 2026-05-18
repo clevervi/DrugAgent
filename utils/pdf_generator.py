@@ -397,7 +397,7 @@ def generate_pdf_report(
 
 def generate_breakthrough_pdf(b_data: dict, output_pdf: str = None):
     """
-    Genera un PDF especial para alertas de Breakthrough Científico.
+    Genera un PDF para candidatos in silico de alta prioridad (no es informe clínico).
     """
     if not output_pdf:
         target_clean = str(b_data.get('target_name', 'TARGET')).replace(" ", "_").upper()
@@ -415,7 +415,7 @@ def generate_breakthrough_pdf(b_data: dict, output_pdf: str = None):
     pdf.set_xy(10, 16)
     pdf.set_font('helvetica', 'B', 16)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 10, f"🚨 ALERTA DE DESCUBRIMIENTO DE ALTO IMPACTO IN SILICO", 0, align='C')
+    pdf.cell(0, 10, "Candidato in silico de alta prioridad", 0, align='C')
     pdf.ln(12)
     
     pdf.set_font('helvetica', 'B', 20)
@@ -430,7 +430,7 @@ def generate_breakthrough_pdf(b_data: dict, output_pdf: str = None):
     # Justificación / Explicación
     pdf.set_font('helvetica', 'B', 12)
     pdf.set_text_color(30, 58, 138)
-    pdf.cell(0, 8, "Justificación Científica del Avance", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 8, "Resumen computacional (requiere validacion experimental)", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
     pdf.set_font('helvetica', '', 11)
     pdf.set_text_color(51, 65, 85)
@@ -462,7 +462,7 @@ def generate_breakthrough_pdf(b_data: dict, output_pdf: str = None):
     
     if b_data.get('md_refined_score') or b_data.get('md_rmsd'):
         pdf.set_font('helvetica', 'B', 10)
-        pdf.cell(50, 6, "MD Score / RMSD:", 0)
+        pdf.cell(50, 6, "Estabilidad proxy:", 0)
         pdf.set_font('helvetica', '', 10)
         pdf.cell(50, 6, f"{b_data.get('md_refined_score', 'N/A')} kcal/mol | {b_data.get('md_rmsd', 'N/A')} Å", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
