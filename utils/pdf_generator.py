@@ -10,6 +10,20 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 
 
+def _chunk_line_for_pdf(text: str, max_len: int = 92) -> List[str]:
+    """Evita líneas sin espacios (tablas/SMILES) que rompen fpdf multi_cell."""
+    text = _sanitize_pdf_text(text or "")
+    if not text:
+        return []
+    if len(text) <= max_len:
+        return [text]
+    chunks: List[str] = []
+    while text:
+        chunks.append(text[:max_len])
+        text = text[max_len:]
+    return chunks
+
+
 def _sanitize_pdf_text(text: str) -> str:
     """fpdf core fonts: reemplazar caracteres fuera de latin-1."""
     if not text:
@@ -223,6 +237,10 @@ def generate_pdf_report(
     pdf.ln(6)
 
     if evidence_lines or evidence_meta:
+        if pdf.get_y() > 240:
+            pdf.add_page()
+        pdf.set_x(pdf.l_margin)
+        ew = pdf.epw
         pdf.set_font('helvetica', 'B', 14)
         pdf.set_text_color(30, 58, 138)
         pdf.cell(0, 8, "Evidencia publica (ChEMBL API)", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -231,15 +249,22 @@ def generate_pdf_report(
         chembl_tid = evidence_meta.get("chembl_target_id", "")
         n_act = evidence_meta.get("n_activities", "")
         if chembl_tid:
+            pdf.set_x(pdf.l_margin)
             pdf.multi_cell(
-                0, 5,
+                ew, 5,
                 _sanitize_pdf_text(
                     f"ChEMBL target: {chembl_tid} | Actividades de referencia: {n_act}. "
                     "Docking (kcal/mol) no es comparable con IC50/Ki; se usa Tanimoto vs ligandos curados."
                 ),
             )
         for line in evidence_lines:
-            pdf.multi_cell(0, 4.5, line)
+            for chunk in _chunk_line_for_pdf(line):
+                if not chunk.strip():
+                    continue
+                if pdf.get_y() > 265:
+                    pdf.add_page()
+                pdf.set_x(pdf.l_margin)
+                pdf.multi_cell(ew, 4.5, chunk)
         pdf.ln(6)
     elif effective_run_id:
         pdf.set_font('helvetica', 'I', 9)
