@@ -164,8 +164,45 @@ def reflector_node(state: AgentState) -> dict:
     offline = os.environ.get("OFFLINE_MODE", "False").lower() in ["true", "1", "yes"]
     local_base = os.environ.get("LOCAL_LLM_BASE_URL", "").strip()
 
-    top3_lines = [f"  - SMILES: {(m.get('smiles') or '')[:50]}, score: {m.get('docking_score', 'N/A')}" for m in top_candidates[:3]]
-    iteration_summary = f"ITERACION {iteration} - RESUMEN:\nDockeados: {len(docked_mols)}\nScore promedio: {avg_score:.2f}\nTop:\n{chr(10).join(top3_lines)}"
+    top3_lines = [
+        f"  - SMILES: {(m.get('smiles') or '')[:50]}, score: {m.get('docking_score', 'N/A')}, "
+        f"QED: {m.get('qed', 'N/A')}, hERG: {m.get('herg_risk', 'N/A')}"
+        for m in top_candidates[:3]
+    ]
+    iteration_summary = (
+        f"ITERACION {iteration} - RESUMEN:\nDockeados: {len(docked_mols)}\n"
+        f"Score promedio: {avg_score:.2f}\nTop:\n{chr(10).join(top3_lines)}"
+    )
+
+    # ── Literatura PubMed (solo en iteración 1 o cada 5) ─────────────────────
+    pubmed_context = ""
+    if iteration == 1 or iteration % 5 == 0:
+        try:
+            from utils.pubmed_client import get_target_literature
+            from pathlib import Path
+            pubmed_context = get_target_literature(
+                state.get("target_name", "EGFR"),
+                max_results=4,
+                cache_dir=Path("data/evidence/pubmed_cache"),
+            )
+            if pubmed_context:
+                iteration_summary += f"\n\n{pubmed_context}"
+                print(f"   [PubMed] Literatura inyectada en contexto del reflector ({len(pubmed_context)} chars).")
+        except Exception as e_pub:
+            print(f"   [PubMed] No disponible: {e_pub}")
+
+    # ── MMP SAR Analysis ──────────────────────────────────────────────────────
+    mmp_context = ""
+    if len(all_candidates) >= 10:
+        try:
+            from utils.mmp_analysis import analyze_mmps, identify_best_substituents
+            mmp_context = analyze_mmps(all_candidates)
+            sar_corr = identify_best_substituents(all_candidates)
+            if mmp_context or sar_corr:
+                iteration_summary += f"\n\n{mmp_context}\n{sar_corr}"
+                print(f"   [MMP] Análisis SAR inyectado ({len(mmp_context)+len(sar_corr)} chars).")
+        except Exception as e_mmp:
+            print(f"   [MMP] No disponible: {e_mmp}")
     
     # Inyección de fallos de skills para Auto-Curación (Self-Healing)
     skill_failures = state.get("skill_failures", {})
@@ -193,7 +230,7 @@ def reflector_node(state: AgentState) -> dict:
     
     system_prompt = REFLECTOR_SYSTEM_PROMPT
     try:
-        with open("./config/config.yaml") as f:
+        with open("./config/config.yaml", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
             system_prompt = cfg.get("prompts", {}).get("reflector_prompt", system_prompt)
     except Exception: pass

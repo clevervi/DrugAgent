@@ -76,7 +76,16 @@ model Candidate {
   delta_docking_parent Float?
   generation_source    String?
   guardrail_passed     Boolean?
-  
+
+  // Nuevos ADMET endpoints (hERG, BBB, CYP3A4)
+  herg_risk            Float?
+  bbb_permeability     Float?
+  cyp3a4_inhibition    Float?
+
+  // MD Simulator — métricas conformacionales MMFF94
+  md_strain_energy     Float?
+  md_flexibility       String?
+
   created_at        DateTime @default(now())
   
   @@unique([run_id, smiles]) // Evitar duplicados por corrida

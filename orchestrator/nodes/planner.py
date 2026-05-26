@@ -19,7 +19,7 @@ def planner_node(state: AgentState) -> dict:
     import yaml
     planner_prompt_tmpl = "En 2 oraciones: ¿Cuáles son las características clave que debe tener un inhibidor de {target}? Sé muy conciso y científico."
     try:
-        with open("./config/config.yaml") as f:
+        with open("./config/config.yaml", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         planner_prompt_tmpl = cfg.get("prompts", {}).get("planner_prompt", planner_prompt_tmpl)
     except Exception:

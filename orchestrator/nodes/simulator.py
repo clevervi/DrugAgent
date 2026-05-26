@@ -46,15 +46,19 @@ def simulator_node(state: AgentState) -> dict:
                     dp = area_data.get("docking_params", {})
                     center = (dp.get("center_x", center[0]), dp.get("center_y", center[1]), dp.get("center_z", center[2]))
                     box_size = (dp.get("size_x", box_size[0]), dp.get("size_y", box_size[1]), dp.get("size_z", box_size[2]))
-                    matched = True
-                    print(f"   🧬 Coordenadas del catálogo aplicadas para {pdb_id}: center={center}, size={box_size}")
+                    # (0,0,0) es marcador de "sin coordenadas reales" → forzar detección dinámica
+                    if center == (0.0, 0.0, 0.0):
+                        print(f"   ⚠️ Catálogo: {pdb_id} tiene center=(0,0,0) → detección dinámica")
+                    else:
+                        matched = True
+                        print(f"   🧬 Coordenadas del catálogo aplicadas para {pdb_id}: center={center}, size={box_size}")
                     break
     except Exception as e_cat:
         print(f"   ⚠️ Error cargando catálogo de coordenadas: {e_cat}")
 
     # 2. Cargar config local como fallback/override
     try:
-        with open("./config/config.yaml") as f:
+        with open("./config/config.yaml", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         dc = cfg.get("docking", {})
         if not matched:

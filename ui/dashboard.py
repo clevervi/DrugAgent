@@ -610,7 +610,7 @@ st.markdown(
 )
 
 # Convertir candidatos del run a DataFrame
-numeric_columns = ["sa_score", "ligand_efficiency", "qed", "mw", "iteration", "docking_score", "admet_toxicity", "md_rmsd", "md_refined_score"]
+numeric_columns = ["sa_score", "ligand_efficiency", "qed", "mw", "iteration", "docking_score", "admet_toxicity", "admet_absorption", "herg_risk", "bbb_permeability", "cyp3a4_inhibition", "md_rmsd", "md_refined_score", "md_strain_energy"]
 if candidates:
     df = pd.DataFrame(candidates)
     if "docking_score" in df.columns:
@@ -654,12 +654,13 @@ else:
 st.divider()
 
 # --- ARQUITECTURA MULTI-PESTAÑA (TABS) ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🧬 Visor de Acoplamiento 3D", 
-    "🏆 Top Candidatos Generados", 
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "🧬 Visor de Acoplamiento 3D",
+    "🏆 Top Candidatos Generados",
     "📊 Análisis Estadístico y Evolución",
+    "🗺️ Espacio Químico & Pareto",
     "🧠 Skills & Directorio de Ciencia",
-    "💻 Consola y Logs en Vivo"
+    "💻 Consola y Logs en Vivo",
 ])
 
 # TAB 1: VISOR MOLECULAR 3D INTERACTIVO
@@ -847,15 +848,30 @@ with tab2:
                         status_str = mol_data.get("status", "N/A")
                         md_rmsd = mol_data.get("md_rmsd", 0.0)
                         md_refined = mol_data.get("md_refined_score", 0.0)
-                        
+                        md_strain = mol_data.get("md_strain_energy", None)
+                        md_flex = mol_data.get("md_flexibility", None)
+                        herg = mol_data.get("herg_risk", None)
+                        bbb = mol_data.get("bbb_permeability", None)
+                        cyp = mol_data.get("cyp3a4_inhibition", None)
+
                         md_info = f"- **Estabilidad MD**: `{md_rmsd:.2f} Å` (Refinado: `{md_refined:.2f}`)" if md_rmsd and md_rmsd > 0 else "- **Estabilidad MD**: `No refinado`"
-                        
+                        strain_info = f"- **Strain MMFF94**: `{md_strain:.1f} kcal/mol` ({md_flex})" if md_strain is not None else ""
+                        herg_icon = "🔴" if (herg or 0) > 0.6 else ("🟡" if (herg or 0) > 0.35 else "🟢")
+                        bbb_icon = "🟢" if (bbb or 0) > 0.6 else "🔴"
+                        herg_info = f"- **hERG Risk**: {herg_icon} `{herg:.2f}`" if herg is not None else ""
+                        bbb_info = f"- **BBB Perm**: {bbb_icon} `{bbb:.2f}`" if bbb is not None else ""
+                        cyp_info = f"- **CYP3A4 Inhib**: `{cyp:.2f}`" if cyp is not None else ""
+
                         st.markdown(f"""
                         - **Docking Score**: `{docking} kcal/mol`
                         {md_info}
+                        {strain_info}
                         - **Ligand Efficiency**: `{le:.3f}`
                         - **QED (Drug-likeness)**: `{qed:.3f}`
                         - **SA Score (Sintetizabilidad)**: `{sa:.2f}`
+                        {herg_info}
+                        {bbb_info}
+                        {cyp_info}
                         - **Estado**: `{status_str}`
                         """)
                         st.divider()
@@ -917,8 +933,147 @@ with tab3:
         except Exception as e_glob:
             st.info("No se pudieron cargar datos históricos globales.")
 
-# TAB 4: COMPILED SCIENTIFIC SKILLS DIRECTORY & VECTOR MEMORY (RAG)
+# TAB 4: ESPACIO QUÍMICO UMAP + FRENTE PARETO
 with tab4:
+    st.subheader("Espacio Químico y Análisis Multi-Objetivo")
+
+    if df.empty:
+        st.info("No hay candidatos en la misión seleccionada. Ejecuta una corrida primero.")
+    else:
+        umap_col, pareto_col = st.columns([1, 1])
+
+        with umap_col:
+            st.markdown("#### UMAP — Navegación del Espacio Químico")
+            st.caption("Cada punto es una molécula. Color = score de docking. El agente explora alejándose de las regiones ya cubiertas.")
+            try:
+                import umap as umap_lib
+                from rdkit.Chem import rdFingerprintGenerator as rfg_mod
+                HAS_UMAP = True
+            except ImportError:
+                HAS_UMAP = False
+
+            if HAS_UMAP:
+                @st.cache_data(ttl=30)
+                def compute_umap(smiles_list, scores, iterations, qeds):
+                    fp_gen = rfg_mod.GetMorganGenerator(radius=2, fpSize=1024)
+                    fps, valid_idx = [], []
+                    for i, smi in enumerate(smiles_list):
+                        mol = Chem.MolFromSmiles(smi)
+                        if mol:
+                            fps.append(list(fp_gen.GetFingerprint(mol)))
+                            valid_idx.append(i)
+                    if len(fps) < 5:
+                        return None
+                    reducer = umap_lib.UMAP(n_components=2, random_state=42, metric="jaccard", n_neighbors=min(15, len(fps)-1))
+                    embedding = reducer.fit_transform(fps)
+                    return {
+                        "x": embedding[:, 0].tolist(),
+                        "y": embedding[:, 1].tolist(),
+                        "smiles": [smiles_list[i] for i in valid_idx],
+                        "score": [scores[i] for i in valid_idx],
+                        "iteration": [iterations[i] for i in valid_idx],
+                        "qed": [qeds[i] for i in valid_idx],
+                    }
+
+                smiles_list = df["smiles"].fillna("").tolist()
+                scores_list = df["docking_score"].fillna(0).tolist()
+                iters_list = df["iteration"].fillna(0).tolist()
+                qeds_list = df["qed"].fillna(0).tolist()
+
+                umap_data = compute_umap(tuple(smiles_list), tuple(scores_list), tuple(iters_list), tuple(qeds_list))
+                if umap_data:
+                    umap_df = pd.DataFrame(umap_data)
+                    fig_umap = px.scatter(
+                        umap_df, x="x", y="y",
+                        color="score", color_continuous_scale="RdYlGn",
+                        hover_data={"smiles": True, "score": ":.2f", "qed": ":.2f", "iteration": True},
+                        labels={"score": "Docking Score", "x": "UMAP-1", "y": "UMAP-2"},
+                        title="Espacio Químico (Morgan ECFP4 + UMAP Jaccard)",
+                    )
+                    fig_umap.update_traces(marker=dict(size=7, opacity=0.8))
+                    fig_umap.update_layout(
+                        plot_bgcolor="#0b0f19", paper_bgcolor="#0b0f19",
+                        font_color="#f1f5f9", height=420,
+                    )
+                    st.plotly_chart(fig_umap, use_container_width=True)
+                else:
+                    st.info("Necesitas al menos 5 candidatos con SMILES válidos para UMAP.")
+            else:
+                st.warning("Instala umap-learn para visualización del espacio químico: pip install umap-learn")
+
+        with pareto_col:
+            st.markdown("#### Frente de Pareto — Multi-Objetivo")
+            st.caption("Candidatos no dominados: mejor docking Y mejor QED simultáneamente. Estos son los candidatos de interés medicinal.")
+
+            df_pareto = df.dropna(subset=["docking_score", "qed"]).copy()
+            if len(df_pareto) >= 3:
+                scores_arr = df_pareto["docking_score"].values
+                qed_arr = df_pareto["qed"].values
+
+                # Calcular frente Pareto (minimizar score, maximizar QED)
+                pareto_mask = []
+                for i in range(len(scores_arr)):
+                    dominated = False
+                    for j in range(len(scores_arr)):
+                        if i == j:
+                            continue
+                        if scores_arr[j] <= scores_arr[i] and qed_arr[j] >= qed_arr[i]:
+                            if scores_arr[j] < scores_arr[i] or qed_arr[j] > qed_arr[i]:
+                                dominated = True
+                                break
+                    pareto_mask.append(not dominated)
+
+                df_pareto["pareto"] = ["Pareto Front" if m else "Dominated" for m in pareto_mask]
+                tox_col_name = "admet_toxicity" if "admet_toxicity" in df_pareto.columns else None
+                hover_cols = {"smiles": True, "docking_score": ":.2f", "qed": ":.2f"}
+                if tox_col_name:
+                    hover_cols[tox_col_name] = ":.2f"
+
+                fig_pareto = px.scatter(
+                    df_pareto,
+                    x="docking_score", y="qed",
+                    color="pareto",
+                    color_discrete_map={"Pareto Front": "#22c55e", "Dominated": "#475569"},
+                    hover_data=hover_cols,
+                    labels={"docking_score": "Docking Score (kcal/mol)", "qed": "QED"},
+                    title="Frente de Pareto: Afinidad vs Drug-Likeness",
+                    symbol="pareto",
+                )
+                fig_pareto.update_traces(marker=dict(size=9, opacity=0.85))
+                fig_pareto.update_layout(
+                    plot_bgcolor="#0b0f19", paper_bgcolor="#0b0f19",
+                    font_color="#f1f5f9", height=420,
+                )
+                st.plotly_chart(fig_pareto, use_container_width=True)
+
+                n_pareto = sum(pareto_mask)
+                st.metric("Candidatos en Frente Pareto", n_pareto, help="No dominados en score+QED simultáneamente")
+                pareto_df_display = df_pareto[df_pareto["pareto"] == "Pareto Front"][["smiles", "docking_score", "qed"]].head(10)
+                if not pareto_df_display.empty:
+                    st.dataframe(pareto_df_display.style.format({"docking_score": "{:.2f}", "qed": "{:.3f}"}), use_container_width=True)
+            else:
+                st.info("Necesitas al menos 3 candidatos con score y QED para el análisis Pareto.")
+
+    st.divider()
+    st.markdown("#### SAR — Análisis de Pares Moleculares (MMP)")
+    if not df.empty and len(df) >= 8:
+        try:
+            cands_for_mmp = df.to_dict("records")
+            from utils.mmp_analysis import analyze_mmps, identify_best_substituents
+            mmp_text = analyze_mmps(cands_for_mmp)
+            sar_text = identify_best_substituents(cands_for_mmp)
+            if mmp_text or sar_text:
+                st.code(f"{mmp_text}\n\n{sar_text}", language=None)
+            else:
+                st.info("No se detectaron pares moleculares emparejados suficientes todavía.")
+        except Exception as e_mmp:
+            st.caption(f"MMP no disponible: {e_mmp}")
+    else:
+        st.info("El análisis MMP requiere al menos 8 candidatos en la misión.")
+
+
+# TAB 5: COMPILED SCIENTIFIC SKILLS DIRECTORY & VECTOR MEMORY (RAG)
+with tab5:
     st.subheader("🧠 Skills de Auto-Mejora y RAG Científico")
     
     skill_subtab, rag_subtab = st.tabs([
@@ -963,11 +1118,11 @@ with tab4:
             except Exception as e_rag:
                 st.error(f"Error cargando ChromaDB: {e_rag}")
 
-# TAB 5: DATOS COMPLETOS Y CONSOLA DE LOGS
-with tab5:
+# TAB 6: DATOS COMPLETOS Y CONSOLA DE LOGS
+with tab6:
     st.subheader("📋 Historial Completo de Candidatos Diseñados")
     if not df.empty:
-        cols_to_show = ["smiles", "docking_score", "md_rmsd", "md_refined_score", "ligand_efficiency", "sa_score", "qed", "logp", "mw", "admet_toxicity", "status"]
+        cols_to_show = ["smiles", "docking_score", "md_refined_score", "md_strain_energy", "md_flexibility", "ligand_efficiency", "sa_score", "qed", "logp", "mw", "admet_toxicity", "herg_risk", "bbb_permeability", "cyp3a4_inhibition", "status"]
         df_show = df[[c for c in cols_to_show if c in df.columns]]
         st.dataframe(df_show, use_container_width=True)
     else:

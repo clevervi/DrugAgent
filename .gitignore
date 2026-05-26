@@ -53,3 +53,8 @@ mlruns/
 # LinkedIn post drafts
 docs/linkedin_post.md
 
+# Backups and archives
+data/_backup/
+memory/skills/_archive_20260526/
+
+

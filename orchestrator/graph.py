@@ -161,7 +161,7 @@ def run_agent(
     """Ejecuta el agente de drug discovery."""
     
     import yaml
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
     
     run_id = db_run_id if db_run_id else str(uuid.uuid4())[:8]
@@ -199,6 +199,7 @@ def run_agent(
         "therapeutic_area": therapeutic_area,
         "indication_label": indication_label,
         "parent_smiles": parent_smiles,
+        "skill_failures": {},
     }
     
     print(f"\n🚀 DrugAgent iniciado")
@@ -229,7 +230,7 @@ if __name__ == "__main__":
     parser.add_argument("--target", default="EGFR", help="Target terapéutico")
     parser.add_argument("--pdb", default="4HJO", help="PDB ID de la proteína")
     parser.add_argument("--iterations", type=int, default=20, help="Número de iteraciones")
-    parser.add_argument("--workflow", default="de_novo", choices=["de_novo", "lead_opt"], help="Modo de workflow")
+    parser.add_argument("--workflow", default="de_novo", choices=["de_novo", "lead_opt", "repurposing"], help="Modo de workflow: de_novo | lead_opt | repurposing")
     parser.add_argument("--area", default="Oncología", help="Área terapéutica")
     parser.add_argument("--indication", default="Cáncer de Pulmón (EGFR)", help="Indicación clínica")
     parser.add_argument("--parent-smiles", default=None, help="SMILES de partida para optimización")

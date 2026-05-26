@@ -76,22 +76,51 @@ def validate_pdb_id(pdb_id: str) -> bool:
 
 def download_pdb(pdb_id: str, out_path: Path) -> bool:
     """
-    Descarga autónomamente un receptor en formato PDB desde RCSB PDB.
+    Descarga receptor en formato PDB. Intenta RCSB PDB primero;
+    si falla y el ID parece un UniProt accession, intenta AlphaFold DB como fallback.
+    Soporta IDs tipo 'AF-P00533-F1' para descargar directamente desde AlphaFold DB.
     """
     import urllib.request
-    pdb_id = pdb_id.strip().upper()
-    url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+    pdb_id_clean = pdb_id.strip().upper()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # ── Descarga directa desde AlphaFold DB si el ID empieza con AF- ──────────
+    if pdb_id_clean.startswith("AF-"):
+        af_url = f"https://alphafold.ebi.ac.uk/files/{pdb_id_clean}-model_v4.pdb"
+        try:
+            print(f"   [AlphaFold] Descargando {pdb_id_clean} desde AlphaFold DB...")
+            urllib.request.urlretrieve(af_url, str(out_path))
+            if out_path.exists() and out_path.stat().st_size > 5000:
+                print(f"   [AlphaFold] OK — {out_path.stat().st_size} bytes.")
+                return True
+        except Exception as e:
+            print(f"   [AlphaFold] Fallo: {e}")
+        return False
+
+    # ── Intento principal: RCSB PDB ───────────────────────────────────────────
+    url = f"https://files.rcsb.org/download/{pdb_id_clean}.pdb"
     try:
-        print(f"   📥 Descargando receptor {pdb_id} desde RCSB PDB ({url})...")
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+        print(f"   [RCSB] Descargando {pdb_id_clean}...")
         urllib.request.urlretrieve(url, str(out_path))
         if out_path.exists() and out_path.stat().st_size > 5000:
-            print(f"   ✅ Receptor {pdb_id} descargado con éxito ({out_path.stat().st_size} bytes).")
+            print(f"   [RCSB] OK — {out_path.stat().st_size} bytes.")
             return True
-        else:
-            print(f"   ⚠️ Archivo descargado para {pdb_id} es inválido o muy pequeño.")
+        print(f"   [RCSB] Archivo inválido para {pdb_id_clean}.")
     except Exception as e:
-        print(f"   ⚠️ Error descargando PDB {pdb_id}: {e}")
+        print(f"   [RCSB] Error: {e}")
+
+    # ── Fallback: AlphaFold DB por UniProt (si es 6 chars alfanumérico) ───────
+    if len(pdb_id_clean) == 6 and pdb_id_clean.isalnum():
+        af_url = f"https://alphafold.ebi.ac.uk/files/AF-{pdb_id_clean}-F1-model_v4.pdb"
+        try:
+            print(f"   [AlphaFold fallback] Intentando {pdb_id_clean} como UniProt...")
+            urllib.request.urlretrieve(af_url, str(out_path))
+            if out_path.exists() and out_path.stat().st_size > 5000:
+                print(f"   [AlphaFold fallback] OK — {out_path.stat().st_size} bytes.")
+                return True
+        except Exception as e_af:
+            print(f"   [AlphaFold fallback] Fallo: {e_af}")
+
     return False
 
 def predict_binding_pocket(pdb_path: Path) -> Optional[dict]:

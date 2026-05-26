@@ -128,6 +128,46 @@ def fetch_molecule(molecule_chembl_id: str, cache_dir: Optional[Path] = None) ->
     return _cached_get(url, cache_dir, f"mol_{mid}")
 
 
+def fetch_approved_drugs_for_target(
+    target_name: str,
+    min_pchembl: float = 6.0,
+    limit: int = 30,
+    cache_dir: Optional[Path] = None,
+) -> List[str]:
+    """
+    Retorna SMILES de compuestos activos contra el target desde ChEMBL.
+    min_pchembl >= 6.0 equivale a IC50 <= 1 µM (potencia alta).
+    Usado por el workflow 'repurposing' para sembrar la generacion con activos conocidos.
+    """
+    if cache_dir is None:
+        cache_dir = Path("data/evidence/cache")
+
+    target_id = resolve_target_chembl_id(target_name, cache_dir=cache_dir)
+    if not target_id:
+        return []
+
+    activities = fetch_activities(target_id, limit=limit * 4, cache_dir=cache_dir)
+    smiles_out: List[str] = []
+    seen: set = set()
+
+    for act in activities:
+        smi = act.get("canonical_smiles", "").strip()
+        if not smi or smi in seen:
+            continue
+        pchembl = act.get("pchembl_value")
+        try:
+            passes = (pchembl is None) or (float(pchembl) >= min_pchembl)
+        except (TypeError, ValueError):
+            passes = True
+        if passes:
+            seen.add(smi)
+            smiles_out.append(smi)
+        if len(smiles_out) >= limit:
+            break
+
+    return smiles_out
+
+
 def load_evidence_config_for_target(target_name: str) -> dict:
     import yaml
     path = Path("catalog/evidence_targets.yaml")

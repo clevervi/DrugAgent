@@ -66,10 +66,11 @@ if __name__ == "__main__":
     parser.add_argument("--target", default="EGFR", help="Target terapeutico (default: EGFR)")
     parser.add_argument("--pdb", default="4HJO", help="PDB ID de la proteina (default: 4HJO)")
     parser.add_argument("--iterations", type=int, default=10, help="Numero de iteraciones (default: 10)")
-    parser.add_argument("--workflow", default="de_novo", choices=["de_novo", "lead_opt"], help="Workflow mode (de_novo o lead_opt)")
+    parser.add_argument("--workflow", default="de_novo", choices=["de_novo", "lead_opt", "repurposing"], help="Workflow mode: de_novo | lead_opt | repurposing (usa activos ChEMBL como seeds)")
     parser.add_argument("--area", default="Oncología", help="Area terapeutica (ej. Oncologia, Diabetes Tipo 2, SARS-CoV-2)")
     parser.add_argument("--indication", default="Cáncer de Pulmón (EGFR)", help="Indicacion clinica detallada")
     parser.add_argument("--parent-smiles", default=None, help="SMILES padre de partida para lead_opt")
+    parser.add_argument("--export-sdf", action="store_true", default=False, help="Exportar top candidatos a SDF al finalizar")
     args = parser.parse_args()
 
     from core.docking import validate_pdb_id
@@ -244,3 +245,14 @@ if __name__ == "__main__":
         generate_pdf_report(run_id=run_record.id)
     except Exception as e:
         print(f"Error generando PDF: {e}")
+
+    # Exportar SDF si se solicitó
+    if args.export_sdf and result:
+        try:
+            from utils.sdf_exporter import export_top_candidates_sdf
+            top = result.get("top_candidates", []) if isinstance(result, dict) else []
+            if top:
+                sdf_path = export_top_candidates_sdf(run_record.id, top, top_n=20)
+                print(f"SDF exportado: {sdf_path}")
+        except Exception as e:
+            print(f"Error exportando SDF: {e}")

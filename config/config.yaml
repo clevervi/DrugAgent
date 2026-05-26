@@ -38,9 +38,16 @@ llm:
   max_tokens: 4096
   fallback_model: llama-3.1-8b-instant  # Para rate limit
 
+# Perfil de filtrado molecular — controla qué moléculas pasan los filtros
+# standard: Ro5 estricto, PAINS bloquea, tox<0.6, SA<=4.5  (conservador, produccion)
+# permissive: Ro5 relajado MW≤800, PAINS solo advierte, tox<0.8, SA<=6.0  (exploracion libre)
+# cns: BBB-tuned MW<450 TPSA<90 logP 0-5, PAINS advierte  (farmacos para cerebro)
+# natural_products: MW hasta 1000, SA<=6.5, macrolidos/ciclopeptidos  (quimica de productos naturales)
+filter_profile: standard
+
 # Thresholds de calidad
 thresholds:
-  min_docking_score: -7.0   # kcal/mol (mejor = más negativo)
+  min_docking_score: -6.5   # kcal/mol (mejor = más negativo)
   max_mw: 500
   max_logp: 5.0
   min_qed: 0.4
@@ -103,27 +110,36 @@ prompts:
       {{"smiles": "CC(=O)O"}}
     ]
   reflector_prompt: |
-    Rol: Químico Medicinal Principal y Orquestador de DrugAgent.
-    Analiza la corrida actual de descubrimiento in silico para {target} (PDB: {target_pdb_id}).
-    
-    ESTADO DE LA CORRIDA:
+    Eres el Científico-Reflector de un agente autónomo de drug discovery.
+    Analiza la corrida actual para {target_name} (PDB: {target_pdb_id}).
+
+    ESTADO:
     - Iteración: {iteration}/{max_iterations}
-    - Total Candidatos Evaluados: {total_candidates}
-    - Mejor Afinidad Encontrada: {best_docking_score} kcal/mol
-    
-    CANDIDATOS RECIENTES EVALUADOS:
+    - Candidatos totales: {total_candidates}
+    - Mejor afinidad: {best_docking_score} kcal/mol
+
+    DATOS RECIENTES:
     {candidates_data}
-    
-    ÚLTIMOS INSIGHTS REGISTRADOS EN MEMORIA VECTORIAL:
+
+    CONTEXTO CIENTÍFICO (RAG):
     {memory_context}
-    
-    Tu tarea es:
-    1. Generar 1 Insight Crítico Científico (máximo 2 oraciones) indicando qué características químicas parecen mejorar la afinidad de docking o la solubilidad, o sugiriendo sustituyentes específicos (ej. introducir fluoruros, cambiar un aza-heterociclo).
-    2. Modificar o inyectar código Python dinámico para el generador ("skill") SI Y SOLO SI identificas un patrón recurrente de fallo (ej. violaciones de Lipinski, o docking débil). La skill debe ser una función en python que mute una molécula de forma inteligente.
-    
-    Responde estrictamente en formato JSON:
+
+    Pipeline: RDKit BRICS → AutoDock Vina → ADMET (hERG, BBB, CYP3A4) → MMFF94 strain.
+    Objetivo: maximizar binding affinity (más negativo) con QED alto, hERG bajo, baja toxicidad.
+
+    Responde ÚNICAMENTE en JSON estricto (sin texto fuera del JSON):
     {{
-      "insight": "...",
-      "skill_code": "```python\n# Código opcional aquí para mutar o refinar cadenas SMILES si aplica\n```"
+        "analysis": "Análisis breve de esta iteración (1-2 oraciones)",
+        "insights": ["Insight SAR concreto 1", "Insight SAR concreto 2"],
+        "next_strategy": "generate",
+        "strategy_reason": "Razón de la estrategia elegida",
+        "new_skill": {{
+            "generate": false,
+            "name": "nombre_skill",
+            "description": "Qué hace",
+            "content": "markdown con bloque ```python ... ```"
+        }},
+        "priority_scaffolds": [],
+        "terminate": false
     }}
 

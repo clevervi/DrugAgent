@@ -144,7 +144,64 @@ AUTONOMOUS_TARGET_POOL = [
         "therapeutic_area": "Oncología",
         "indication_label": "PD-L1 (CD274) — inhibición in silico",
         "workflow": "de_novo"
-    }
+    },
+    # ── Nuevos targets expandidos ──────────────────────────────────────────────
+    {
+        "target": "ABL1",
+        "pdb_id": "1IEP",
+        "therapeutic_area": "Oncología",
+        "indication_label": "BCR-ABL1 — Leucemia Mieloide Crónica (CML)",
+        "workflow": "de_novo"
+    },
+    {
+        "target": "CDK2",
+        "pdb_id": "1FIN",
+        "therapeutic_area": "Oncología",
+        "indication_label": "CDK2 — Ciclo Celular, Tumores Sólidos",
+        "workflow": "de_novo"
+    },
+    {
+        "target": "BRAF",
+        "pdb_id": "4MNE",
+        "therapeutic_area": "Oncología",
+        "indication_label": "BRAF V600E — Melanoma, Cáncer de Tiroides",
+        "workflow": "de_novo"
+    },
+    {
+        "target": "PARP1",
+        "pdb_id": "3L3M",
+        "therapeutic_area": "Oncología",
+        "indication_label": "PARP1 — Cánceres BRCA1/2 (terapia sintética letal)",
+        "workflow": "de_novo"
+    },
+    {
+        "target": "JAK2",
+        "pdb_id": "3E64",
+        "therapeutic_area": "Inflamatoria/Oncológica",
+        "indication_label": "JAK2 — Mielofibrosis, Artritis Reumatoide",
+        "workflow": "de_novo"
+    },
+    {
+        "target": "HDAC1",
+        "pdb_id": "4BKX",
+        "therapeutic_area": "Oncología/Epigenética",
+        "indication_label": "HDAC1 — Inhibidores Epigenéticos",
+        "workflow": "de_novo"
+    },
+    {
+        "target": "AChE",
+        "pdb_id": "1EVE",
+        "therapeutic_area": "Neurológica",
+        "indication_label": "AChE — Alzheimer, Deterioro Cognitivo",
+        "workflow": "de_novo"
+    },
+    {
+        "target": "HIV1_INT",
+        "pdb_id": "3L2T",
+        "therapeutic_area": "Infecciosas",
+        "indication_label": "VIH-1 Integrasa — INSTI (Anti-VIH)",
+        "workflow": "de_novo"
+    },
 ]
 
 def brainstorm_next_target_with_llm() -> dict:

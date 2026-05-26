@@ -94,24 +94,24 @@ KINASE_SCAFFOLDS = [
 ]
 
 
-def lipinski_filter(mol) -> bool:
-    """Filtro de Lipinski Rule of 5 + extensiones Veber."""
+def lipinski_filter(mol, profile: dict = None) -> bool:
+    """Filtro Lipinski/Veber configurable por perfil de filtrado."""
     if mol is None:
         return False
+    p = profile or {}
     mw = Descriptors.ExactMolWt(mol)
     logp = Crippen.MolLogP(mol)
     hbd = rdMolDescriptors.CalcNumHBD(mol)
     hba = rdMolDescriptors.CalcNumHBA(mol)
     tpsa = rdMolDescriptors.CalcTPSA(mol)
     rotbonds = rdMolDescriptors.CalcNumRotatableBonds(mol)
-    
     return (
-        mw <= 500 and
-        logp <= 5.0 and
-        hbd <= 5 and
-        hba <= 10 and
-        tpsa <= 140.0 and
-        rotbonds <= 10
+        mw <= p.get("max_mw", 500) and
+        p.get("min_logp", -10.0) <= logp <= p.get("max_logp", 5.0) and
+        hbd <= p.get("max_hbd", 5) and
+        hba <= p.get("max_hba", 10) and
+        tpsa <= p.get("max_tpsa", 140.0) and
+        rotbonds <= p.get("max_rotbonds", 10)
     )
 
 
@@ -129,7 +129,7 @@ def compute_properties(mol) -> dict:
 
 
 def mutate_smiles(smiles: str) -> str:
-    """Mutación simple de SMILES: sustitución de grupos funcionales."""
+    """Mutación de SMILES por sustitución de grupos funcionales (fallback)."""
     substitutions = [
         ("F", "Cl"), ("Cl", "F"), ("Cl", "Br"),
         ("N", "O"), ("O", "N"), ("c", "n"),
@@ -140,12 +140,53 @@ def mutate_smiles(smiles: str) -> str:
     if random.random() < 0.5 and substitutions:
         old, new = random.choice(substitutions)
         if old in result:
-            # Solo reemplaza una ocurrencia aleatoria
             positions = [i for i in range(len(result)) if result.startswith(old, i)]
             if positions:
                 pos = random.choice(positions)
                 result = result[:pos] + new + result[pos+len(old):]
     return result
+
+
+def brics_generate_from_scaffold(scaffold_smi: str, pool_scaffolds: list) -> str:
+    """
+    Generación molecular mediante descomposición BRICS y recombinación de fragmentos.
+    Produce moléculas quimicamente más plausibles que la mutación de strings.
+    Fallback a mutate_smiles si falla.
+    """
+    from rdkit.Chem.BRICS import BRICSDecompose, BRICSBuild
+    mol = Chem.MolFromSmiles(scaffold_smi)
+    if mol is None:
+        return mutate_smiles(scaffold_smi)
+    try:
+        primary_frags = list(BRICSDecompose(mol, minFragmentSize=3))
+        if not primary_frags:
+            return mutate_smiles(scaffold_smi)
+
+        # Mezclar fragmentos de 1-2 scaffolds adicionales aleatorios
+        extra_frags: list = []
+        sample_pool = random.sample(pool_scaffolds, min(2, len(pool_scaffolds)))
+        for esmi in sample_pool:
+            emol = Chem.MolFromSmiles(esmi)
+            if emol:
+                extra_frags.extend(BRICSDecompose(emol, minFragmentSize=3))
+
+        all_frag_smiles = list(set(primary_frags + extra_frags))
+        frag_mols = [Chem.MolFromSmiles(f) for f in all_frag_smiles]
+        frag_mols = [fm for fm in frag_mols if fm is not None]
+        if not frag_mols:
+            return mutate_smiles(scaffold_smi)
+
+        selected_frags = random.sample(frag_mols, min(6, len(frag_mols)))
+        for nm in BRICSBuild(selected_frags):
+            try:
+                new_smi = Chem.MolToSmiles(nm)
+                if new_smi and Chem.MolFromSmiles(new_smi):
+                    return new_smi
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return mutate_smiles(scaffold_smi)
 
 
 def check_similarity_blacklist(smiles: str, blacklist_smiles: list, threshold: float = 0.85) -> bool:
@@ -194,11 +235,14 @@ class DeepGenerativeModel:
             
     def generate_batch(self, n: int, scaffolds: List[str], previous_smiles: List[str], skills: dict, workflow_mode: str = "de_novo", parent_smiles: str = None, target: str = "EGFR", memory_context: str = "") -> List[str]:
         if self.use_gpu_backend:
-            # return self.reinvent.sample(n, priors=scaffolds)
             pass
-            
+
+        # Cargar perfil de filtrado (standard / permissive / cns / natural_products)
+        from utils.guardrails import load_filter_profile
+        _profile = load_filter_profile()
+
         valid_smiles = []
-        
+
         # Compilar lista negra de SMILES descubiertos recientemente / breakthroughs
         blacklist_smiles = []
         try:
@@ -238,7 +282,7 @@ Responde ÚNICAMENTE con un arreglo JSON válido, sin bloques de código Markdow
 ]
 """
         try:
-            with open("./config/config.yaml") as f:
+            with open("./config/config.yaml", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f)
             generator_prompt_tmpl = cfg.get("prompts", {}).get("generator_prompt", generator_prompt_tmpl)
         except Exception:
@@ -284,26 +328,25 @@ Responde ÚNICAMENTE con un arreglo JSON válido, sin bloques de código Markdow
                 rows = _normalize_llm_molecule_list(data)
                 for smi in _iter_smiles_from_llm_rows(rows):
                     mol = Chem.MolFromSmiles(smi)
-                    if mol and lipinski_filter(mol):
+                    if mol and lipinski_filter(mol, _profile):
                         canonical = Chem.MolToSmiles(mol)
                         if canonical not in valid_smiles and (not previous_smiles or canonical not in previous_smiles):
-                            # COMPROBAR LISTA NEGRA DE SIMILITUD TANIMOTO
                             if check_similarity_blacklist(canonical, blacklist_smiles, threshold=0.85):
-                                print(f"   🚫 [DIVERSIDAD]: Molécula {canonical} rechazada por alta similitud Tanimoto (>=0.85) con la lista negra.")
+                                print(f"   [DIVERSIDAD]: Molécula rechazada por alta similitud Tanimoto (>=0.85).")
                                 continue
                             from utils.guardrails import validate_molecular_safety
                             is_safe, _ = validate_molecular_safety(canonical)
                             if is_safe:
                                 valid_smiles.append(canonical)
-                
+
                 if valid_smiles:
-                    print(f"   🧠 [Local LLM] Se generaron {len(valid_smiles)} SMILES válidos y estructuralmente diversos.")
+                    print(f"   [Local LLM] Se generaron {len(valid_smiles)} SMILES válidos y estructuralmente diversos.")
                     n_missing = n - len(valid_smiles)
                     if n_missing <= 0:
                         return valid_smiles
                     n = n_missing
             except Exception as e_local:
-                print(f"   ⚠️ [Local LLM] Falló la generación local ({e_local}). Rebotando a fallbacks...")
+                print(f"   [Local LLM] Falló la generación local ({e_local}). Rebotando a fallbacks...")
 
         # 1. INTENTO DE GENERACIÓN POR IA CLOUD (Gemini o Groq)
         offline = os.environ.get("OFFLINE_MODE", "False").lower() in ["true", "1", "yes"]
@@ -329,25 +372,24 @@ Responde ÚNICAMENTE con un arreglo JSON válido, sin bloques de código Markdow
                     rows = _normalize_llm_molecule_list(data)
                     for smi in _iter_smiles_from_llm_rows(rows):
                         mol = Chem.MolFromSmiles(smi)
-                        if mol and lipinski_filter(mol):
+                        if mol and lipinski_filter(mol, _profile):
                             canonical = Chem.MolToSmiles(mol)
                             if canonical not in valid_smiles and (not previous_smiles or canonical not in previous_smiles):
-                                # COMPROBAR LISTA NEGRA DE SIMILITUD TANIMOTO
                                 if check_similarity_blacklist(canonical, blacklist_smiles, threshold=0.85):
                                     continue
                                 from utils.guardrails import validate_molecular_safety
                                 is_safe, _ = validate_molecular_safety(canonical)
                                 if is_safe:
                                     valid_smiles.append(canonical)
-                                        
+
                     if valid_smiles:
-                        print(f"   🧠 [Gemini LLM] Se generaron {len(valid_smiles)} SMILES válidos.")
+                        print(f"   [Gemini LLM] Se generaron {len(valid_smiles)} SMILES válidos.")
                         n_missing = n - len(valid_smiles)
                         if n_missing <= 0:
                             return valid_smiles
                         n = n_missing
                 except Exception as e:
-                    print(f"   ⚠️ [Gemini LLM] Falló la generación ({e}). Intentando con Groq como respaldo...")
+                    print(f"   [Gemini LLM] Falló la generación ({e}). Intentando con Groq como respaldo...")
                     try:
                         groq_key = os.getenv("GROQ_API_KEY", "")
                         if groq_key and not groq_key.startswith("gsk_REEMPLAZA"):
@@ -355,7 +397,7 @@ Responde ÚNICAMENTE con un arreglo JSON válido, sin bloques de código Markdow
                             groq_model = os.getenv("GROQ_HEAVY_MODEL", "llama-3.3-70b-versatile")
                             llm_groq = ChatGroq(model=groq_model, temperature=0.8, max_tokens=2048, groq_api_key=groq_key)
                             response = llm_groq.invoke(prompt)
-                            
+
                             content = response.content.strip()
                             if content.startswith("```json"):
                                 content = content[7:]
@@ -363,30 +405,29 @@ Responde ÚNICAMENTE con un arreglo JSON válido, sin bloques de código Markdow
                                 content = content[3:]
                             if content.endswith("```"):
                                 content = content[:-3]
-                                
+
                             data = json.loads(content.strip())
                             rows = _normalize_llm_molecule_list(data)
                             for smi in _iter_smiles_from_llm_rows(rows):
                                 mol = Chem.MolFromSmiles(smi)
-                                if mol and lipinski_filter(mol):
+                                if mol and lipinski_filter(mol, _profile):
                                     canonical = Chem.MolToSmiles(mol)
                                     if canonical not in valid_smiles and (not previous_smiles or canonical not in previous_smiles):
-                                        # COMPROBAR LISTA NEGRA DE SIMILITUD TANIMOTO
                                         if check_similarity_blacklist(canonical, blacklist_smiles, threshold=0.85):
                                             continue
                                         from utils.guardrails import validate_molecular_safety
                                         is_safe, _ = validate_molecular_safety(canonical)
                                         if is_safe:
                                             valid_smiles.append(canonical)
-                            
+
                             if valid_smiles:
-                                print(f"   🧠 [Groq LLM] Se generaron {len(valid_smiles)} SMILES válidos.")
+                                print(f"   [Groq LLM] Se generaron {len(valid_smiles)} SMILES válidos.")
                                 n_missing = n - len(valid_smiles)
                                 if n_missing <= 0:
                                     return valid_smiles
                                 n = n_missing
                     except Exception as e_groq:
-                        print(f"   ⚠️ [Groq LLM] Falló la generación de IA ({e_groq}). Usando fallback proxy heurístico...")
+                        print(f"   [Groq LLM] Falló la generación de IA ({e_groq}). Usando fallback proxy heurístico...")
 
         # RAG Offline: Extraer scaffolds de la memoria si no tenemos LLM
         if memory_context:
@@ -409,82 +450,116 @@ Responde ÚNICAMENTE con un arreglo JSON válido, sin bloques de código Markdow
                     print(f"      - {esmi}")
                 scaffolds = (extracted_scaffolds * 4) + scaffolds
             
-        # 2. MODO LEAD OPTIMIZATION (Fallback Heurístico)
+        # 2a. MODO REPURPOSING: seed desde compuestos activos de ChEMBL
+        if workflow_mode == "repurposing":
+            chembl_seeds = []
+            try:
+                from utils.chembl_client import fetch_approved_drugs_for_target
+                chembl_seeds = fetch_approved_drugs_for_target(target, limit=20)
+                if chembl_seeds:
+                    print(f"   [Repurposing] {len(chembl_seeds)} compuestos activos obtenidos de ChEMBL para {target}")
+            except Exception as e_chembl:
+                print(f"   [Repurposing] No se pudo obtener de ChEMBL: {e_chembl}. Usando scaffolds locales.")
+            if not chembl_seeds:
+                chembl_seeds = scaffolds[:5]
+
+            fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+            from utils.guardrails import validate_molecular_safety
+            for seed_smi in chembl_seeds:
+                if len(valid_smiles) >= n:
+                    break
+                seed_mol = Chem.MolFromSmiles(seed_smi)
+                if seed_mol is None:
+                    continue
+                seed_fp = fp_gen.GetFingerprint(seed_mol)
+                attempts_seed = 0
+                while len(valid_smiles) < n and attempts_seed < 30:
+                    attempts_seed += 1
+                    candidate = brics_generate_from_scaffold(seed_smi, scaffolds)
+                    mol = Chem.MolFromSmiles(candidate)
+                    if mol is None or not lipinski_filter(mol, _profile):
+                        continue
+                    sim = DataStructs.TanimotoSimilarity(seed_fp, fp_gen.GetFingerprint(mol))
+                    if sim < 0.40:
+                        continue
+                    canonical = Chem.MolToSmiles(mol)
+                    if canonical in valid_smiles or (previous_smiles and canonical in previous_smiles):
+                        continue
+                    if check_similarity_blacklist(canonical, blacklist_smiles, threshold=0.85):
+                        continue
+                    is_safe, _ = validate_molecular_safety(canonical)
+                    if is_safe:
+                        valid_smiles.append(canonical)
+            if valid_smiles:
+                print(f"   [Repurposing BRICS] Generados {len(valid_smiles)} análogos de activos ChEMBL.")
+                return valid_smiles
+
+        # 2b. MODO LEAD OPTIMIZATION con BRICS
         if workflow_mode == "lead_opt" and parent_smiles:
             parent_mol = Chem.MolFromSmiles(parent_smiles)
             if parent_mol:
                 fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
                 parent_fp = fp_gen.GetFingerprint(parent_mol)
+                from utils.guardrails import validate_molecular_safety
                 attempts = 0
                 max_attempts = n * 50
-                
+                use_brics = True
+
                 while len(valid_smiles) < n and attempts < max_attempts:
                     attempts += 1
-                    candidate = mutate_smiles(parent_smiles)
-                    
+                    candidate = brics_generate_from_scaffold(parent_smiles, scaffolds) if use_brics else mutate_smiles(parent_smiles)
+                    # Alterna entre BRICS y mutación para diversidad
+                    use_brics = not use_brics
+
                     mol = Chem.MolFromSmiles(candidate)
-                    if mol is None or not lipinski_filter(mol):
+                    if mol is None or not lipinski_filter(mol, _profile):
                         continue
-                        
                     cand_fp = fp_gen.GetFingerprint(mol)
                     similarity = DataStructs.TanimotoSimilarity(parent_fp, cand_fp)
-                    
-                    if similarity < 0.60:
+                    if similarity < 0.50:
                         continue
-                        
                     canonical = Chem.MolToSmiles(mol)
-                    
-                    from utils.guardrails import validate_molecular_safety
-                    is_safe, reason = validate_molecular_safety(canonical)
+                    is_safe, _ = validate_molecular_safety(canonical)
                     if not is_safe:
                         continue
-                        
                     if canonical in valid_smiles or (previous_smiles and canonical in previous_smiles):
                         continue
-                        
-                    # COMPROBAR LISTA NEGRA DE SIMILITUD TANIMOTO
                     if check_similarity_blacklist(canonical, blacklist_smiles, threshold=0.85):
                         continue
-                        
                     valid_smiles.append(canonical)
-                    
-                if attempts > 0:
-                    print(f"   [Lead Opt Proxy] Completado con optimización Tanimoto.")
+
+                print(f"   [Lead Opt BRICS] Completado con {len(valid_smiles)} análogos.")
                 return valid_smiles
 
-        # 3. PROXY MODE estándar: Scaffold Hopping (Fallback)
+        # 3. PROXY MODE: BRICS Scaffold Hopping (primario) + mutación string (fallback)
+        from utils.guardrails import validate_molecular_safety
         attempts = 0
-        max_attempts = n * 10
-        
+        max_attempts = n * 15
+
         while len(valid_smiles) < n and attempts < max_attempts:
             attempts += 1
             scaffold = random.choice(scaffolds)
-            candidate = scaffold
-            
-            num_mutations = random.randint(1, 3)
-            for _ in range(num_mutations):
-                candidate = mutate_smiles(candidate)
-            
+            # BRICS con probabilidad 0.7, mutación string con 0.3
+            if random.random() < 0.70:
+                candidate = brics_generate_from_scaffold(scaffold, scaffolds)
+            else:
+                candidate = scaffold
+                for _ in range(random.randint(1, 3)):
+                    candidate = mutate_smiles(candidate)
+
             mol = Chem.MolFromSmiles(candidate)
-            if mol is None or not lipinski_filter(mol):
+            if mol is None or not lipinski_filter(mol, _profile):
                 continue
-            
             canonical = Chem.MolToSmiles(mol)
-            
-            from utils.guardrails import validate_molecular_safety
-            is_safe, reason = validate_molecular_safety(canonical)
+            is_safe, _ = validate_molecular_safety(canonical)
             if not is_safe:
                 continue
-                
             if canonical in valid_smiles or (previous_smiles and canonical in previous_smiles):
                 continue
-                
-            # COMPROBAR LISTA NEGRA DE SIMILITUD TANIMOTO
             if check_similarity_blacklist(canonical, blacklist_smiles, threshold=0.85):
                 continue
-            
             valid_smiles.append(canonical)
-        
+
         return valid_smiles
 
 
@@ -519,8 +594,16 @@ def generator_node(state: AgentState) -> dict:
     priority_scaffolds = state.get("priority_scaffolds", [])
     active_scaffolds = KINASE_SCAFFOLDS.copy()
     if priority_scaffolds:
-        print(f"   🎯 Generando con {len(priority_scaffolds)} scaffolds priorizados por el Reflector!")
-        active_scaffolds = (priority_scaffolds * 3) + KINASE_SCAFFOLDS
+        # LLMs sometimes return motif notation (e.g. "O=C(Ar1)Ar2") instead of real SMILES; filter those out
+        valid_priority = [s for s in priority_scaffolds if isinstance(s, str) and Chem.MolFromSmiles(s) is not None]
+        n_bad = len(priority_scaffolds) - len(valid_priority)
+        if n_bad:
+            print(f"   ⚠️ {n_bad} scaffold(s) del Reflector descartados (SMILES inválido)")
+        if valid_priority:
+            print(f"   🎯 Generando con {len(valid_priority)} scaffolds priorizados por el Reflector!")
+            active_scaffolds = (valid_priority * 3) + KINASE_SCAFFOLDS
+        else:
+            print(f"   ⚠️ Ningún scaffold del Reflector es SMILES válido; usando scaffolds base.")
     
     # Tamaño del batch (adaptivo: empieza pequeño)
     batch_size = min(20 + iteration * 2, 50)
@@ -631,8 +714,17 @@ def generator_node(state: AgentState) -> dict:
                 "admet_toxicity": None,
                 "admet_solubility": None,
                 "admet_absorption": None,
+                "herg_risk": None,
+                "bbb_permeability": None,
+                "cyp3a4_inhibition": None,
                 "pains_alert": False,
                 "brenk_alert": False,
+                "sa_score": None,
+                "ligand_efficiency": None,
+                "md_rmsd": None,
+                "md_refined_score": None,
+                "md_strain_energy": None,
+                "md_flexibility": None,
                 "status": "generated",
                 "score_final": None,
                 "uncertainty": None,

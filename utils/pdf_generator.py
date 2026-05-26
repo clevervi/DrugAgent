@@ -293,6 +293,11 @@ def generate_pdf_report(
         score_final = mol_data.get("score_final", 0.0)
         md_rmsd = mol_data.get("md_rmsd")
         md_refined_score = mol_data.get("md_refined_score")
+        md_strain_energy = mol_data.get("md_strain_energy")
+        md_flexibility = mol_data.get("md_flexibility")
+        herg_risk = mol_data.get("herg_risk")
+        bbb_permeability = mol_data.get("bbb_permeability")
+        cyp3a4_inhibition = mol_data.get("cyp3a4_inhibition")
 
         # Generar imagen de estructura molecular 2D
         img_path = f"output/temp_img/{mol_id}.png"
@@ -335,6 +340,12 @@ def generate_pdf_report(
             rmsd_str = f"{md_rmsd:.2f} A (RMSD)" if isinstance(md_rmsd, float) else "N/A"
             ref_score_str = f"{md_refined_score:.2f} kcal/mol (Refinado)" if isinstance(md_refined_score, float) else "N/A"
             pdf.cell(80, 5, f"{rmsd_str} | {ref_score_str}", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        if md_strain_energy is not None:
+            pdf.set_font('helvetica', 'B', 9)
+            pdf.cell(40, 5, "Strain MMFF94:", 0)
+            pdf.set_font('helvetica', '', 9.5)
+            flex_str = f" ({md_flexibility})" if md_flexibility else ""
+            pdf.cell(80, 5, f"{md_strain_energy:.1f} kcal/mol{flex_str}", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         # Fila: Ligand Efficiency
         pdf.set_font('helvetica', 'B', 9)
@@ -361,7 +372,19 @@ def generate_pdf_report(
         pdf.set_font('helvetica', 'B', 9)
         pdf.cell(40, 5, "Perfil ADMET:", 0)
         pdf.set_font('helvetica', '', 9.5)
-        pdf.cell(80, 5, f"Toxicidad: {tox:.3f} | Solubilidad: {sol}", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.cell(80, 5, f"Tox: {tox:.3f} | Sol: {sol}", 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        if herg_risk is not None or bbb_permeability is not None or cyp3a4_inhibition is not None:
+            pdf.set_font('helvetica', 'B', 9)
+            pdf.cell(40, 5, "ADMET avanzado:", 0)
+            pdf.set_font('helvetica', '', 9.5)
+            parts = []
+            if herg_risk is not None:
+                parts.append(f"hERG: {herg_risk:.2f}")
+            if bbb_permeability is not None:
+                parts.append(f"BBB: {bbb_permeability:.2f}")
+            if cyp3a4_inhibition is not None:
+                parts.append(f"CYP3A4: {cyp3a4_inhibition:.2f}")
+            pdf.cell(80, 5, " | ".join(parts), 0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         # Fila: Alertas y Filtros
         pdf.set_font('helvetica', 'B', 9)

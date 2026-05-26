@@ -8,9 +8,10 @@ import json
 import os
 import sys
 
-from rdkit import Chem
-from rdkit.Chem import Descriptors, QED, Crippen, rdMolDescriptors
+from rdkit import Chem, DataStructs
+from rdkit.Chem import Descriptors, QED, Crippen, rdMolDescriptors, rdFingerprintGenerator
 from rdkit.Chem.FilterCatalog import FilterCatalog, FilterCatalogParams
+from rdkit.ML.Cluster import Butina
 
 try:
     from utils import sascorer
@@ -108,6 +109,49 @@ def predict_toxicity_simple(mol) -> float:
 
 
 from utils.scoring import compute_final_score
+from utils.guardrails import load_filter_profile
+
+
+def butina_diverse_select(candidates: list, n: int = 10, cutoff: float = 0.35) -> list:
+    """
+    Selecciona n candidatos diversos usando clustering Butina sobre fingerprints Morgan.
+    Toma el mejor-scoring (menor docking_score) de cada cluster.
+    cutoff: distancia Tanimoto umbral (1 - similitud). 0.35 → ≥65% distintos.
+    """
+    if not candidates or len(candidates) <= n:
+        return candidates
+    fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+    fps, valid = [], []
+    for c in candidates:
+        mol = Chem.MolFromSmiles(c["smiles"])
+        if mol:
+            fps.append(fp_gen.GetFingerprint(mol))
+            valid.append(c)
+    if not fps:
+        return candidates[:n]
+
+    dists = []
+    for i in range(1, len(fps)):
+        sims = DataStructs.BulkTanimotoSimilarity(fps[i], fps[:i])
+        dists.extend(1.0 - s for s in sims)
+
+    clusters = Butina.ClusterData(dists, len(fps), cutoff, isDistData=True)
+
+    selected, seen = [], set()
+    for cluster in clusters:
+        best = min(cluster, key=lambda i: valid[i].get("docking_score", 0.0) or 0.0)
+        if best not in seen:
+            selected.append(valid[best])
+            seen.add(best)
+        if len(selected) >= n:
+            break
+
+    if len(selected) < n:
+        remaining = [valid[i] for i in range(len(valid)) if i not in seen]
+        remaining.sort(key=lambda x: x.get("docking_score", 0.0) or 0.0)
+        selected.extend(remaining[: n - len(selected)])
+
+    return selected[:n]
 
 
 def analyzer_node(state: AgentState) -> dict:
@@ -122,17 +166,23 @@ def analyzer_node(state: AgentState) -> dict:
     iteration = state.get("iteration", 0)
     current_batch = state.get("current_batch", [])
     
-    print(f"\n[Iter {iteration}] 🔍 ANALYZER: Aplicando filtros de seguridad y ADMET...")
-    
+    profile = load_filter_profile()
+    pains_blocks = profile.get("pains_block", True)
+    max_tox = profile.get("max_toxicity", 0.6)
+    max_sa = profile.get("max_sa_score", 4.5)
+    hq_max_tox = profile.get("high_quality_max_tox", 0.3)
+
+    print(f"\n[Iter {iteration}] ANALYZER: Filtros activos — pains_block={pains_blocks}, max_tox={max_tox}, max_sa={max_sa}")
+
     if not current_batch:
         return {
             "next_action": "reflect",
             "iteration_logs": [f"[Iter {iteration}] Analyzer: lote vacío"],
         }
-    
+
     pains_catalog = get_pains_catalog()
     brenk_catalog = get_brenk_catalog()
-    
+
     analyzed_batch = []
     approved_count = 0
     rejected_pains = 0
@@ -192,9 +242,12 @@ def analyzer_node(state: AgentState) -> dict:
         else:
             mol_data["ligand_efficiency"] = 0.0
 
-        # Predicción ADMET mediante MLADMETPredictor
+        # Predicción ADMET completa mediante MLADMETPredictor
         mol_data["admet_toxicity"] = admet_predictor.predict_toxicity(smiles)
         mol_data["admet_absorption"] = admet_predictor.predict_absorption(smiles)
+        mol_data["herg_risk"] = admet_predictor.predict_herg_liability(smiles)
+        mol_data["bbb_permeability"] = admet_predictor.predict_bbb_permeability(smiles)
+        mol_data["cyp3a4_inhibition"] = admet_predictor.predict_cyp3a4_inhibition(smiles)
         
         # Score final recalculado con la toxicidad refinada de MLADMETPredictor y pesos de config
         mol_data["score_final"] = round(compute_final_score(mol_data), 4)
@@ -208,13 +261,13 @@ def analyzer_node(state: AgentState) -> dict:
         if not is_safe:
             mol_data["status"] = "rejected_guardrail"
             rejected_guardrail += 1
-        elif mol_data["pains_alert"]:
+        elif mol_data["pains_alert"] and pains_blocks:
             mol_data["status"] = "rejected_pains"
             rejected_pains += 1
-        elif tox > 0.6:
+        elif tox > max_tox:
             mol_data["status"] = "rejected_toxicity"
             rejected_tox += 1
-        elif mol_data.get("sa_score", 0) > 4.5:
+        elif mol_data.get("sa_score", 0) > max_sa:
             mol_data["status"] = "rejected_sascore"
             rejected_sa += 1
         elif mol_data.get("docking_score") and mol_data["docking_score"] > -5.0:
@@ -222,9 +275,11 @@ def analyzer_node(state: AgentState) -> dict:
         else:
             mol_data["status"] = "analyzed"
             approved_count += 1
-        
+
         if mol_data.get("brenk_alert") and mol_data["status"] == "analyzed":
             mol_data["status"] = "analyzed_brenk_warn"
+        if mol_data.get("pains_alert") and not pains_blocks and mol_data["status"] == "analyzed":
+            mol_data["status"] = "analyzed_pains_warn"
         
         analyzed_batch.append(mol_data)
     
@@ -233,7 +288,7 @@ def analyzer_node(state: AgentState) -> dict:
     min_docking_score = -7.0
     import yaml
     try:
-        with open("./config/config.yaml") as f:
+        with open("./config/config.yaml", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
         min_docking_score = cfg.get("thresholds", {}).get("min_docking_score", -7.0)
     except Exception:
@@ -244,13 +299,12 @@ def analyzer_node(state: AgentState) -> dict:
     effective_docking_threshold = min_docking_score if docking_mode == "real" else -5.5
     print(f"   ℹ️ Aplicando umbral de docking efectivo: {effective_docking_threshold} kcal/mol (Modo: {docking_mode})")
 
-    # Solo pasan: docking score < effective_docking_threshold, sin PAINS, toxicidad < 0.3, SA Score <= 4.5, y seguras
     high_quality = [
         m for m in analyzed_batch
         if (m.get("docking_score") or 0) < effective_docking_threshold
-        and not m.get("pains_alert", True)
-        and (m.get("admet_toxicity") or 1.0) < 0.3
-        and (m.get("sa_score", 10.0) <= 4.5)
+        and (not pains_blocks or not m.get("pains_alert", False))
+        and (m.get("admet_toxicity") or 1.0) < hq_max_tox
+        and (m.get("sa_score", 10.0) <= max_sa)
         and m.get("is_safe", True)
     ]
     
@@ -274,8 +328,9 @@ def analyzer_node(state: AgentState) -> dict:
             
     unique_combined = list(seen.values())
     unique_combined.sort(key=lambda x: x.get("docking_score", 0.0) or 0.0)
-    
-    top_candidates = unique_combined[:10]
+
+    # Selección diversa via Butina clustering (mejor de cada cluster quimicamente distinto)
+    top_candidates = butina_diverse_select(unique_combined, n=10)
     top_dashboard = unique_combined[:20]
     
     # === GUARDADO EN VIVO PARA EL DASHBOARD (PRISMA) ===
@@ -315,6 +370,9 @@ def analyzer_node(state: AgentState) -> dict:
                         'admet_toxicity': c.get("admet_toxicity"),
                         'admet_solubility': c.get("admet_solubility"),
                         'admet_absorption': c.get("admet_absorption"),
+                        'herg_risk': c.get("herg_risk"),
+                        'bbb_permeability': c.get("bbb_permeability"),
+                        'cyp3a4_inhibition': c.get("cyp3a4_inhibition"),
                         'pains_alert': bool(c.get("pains_alert", False)),
                         'brenk_alert': bool(c.get("brenk_alert", False)),
                         'passes_lipinski': bool(c.get("passes_lipinski", False)),
@@ -329,6 +387,10 @@ def analyzer_node(state: AgentState) -> dict:
                         'binding_affinity': c.get("binding_affinity"),
                         'admet_toxicity': c.get("admet_toxicity"),
                         'admet_solubility': c.get("admet_solubility"),
+                        'admet_absorption': c.get("admet_absorption"),
+                        'herg_risk': c.get("herg_risk"),
+                        'bbb_permeability': c.get("bbb_permeability"),
+                        'cyp3a4_inhibition': c.get("cyp3a4_inhibition"),
                         'pains_alert': bool(c.get("pains_alert", False)),
                         'brenk_alert': bool(c.get("brenk_alert", False)),
                         'sa_score': float(c.get("sa_score", 0)),

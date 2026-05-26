@@ -23,17 +23,26 @@ class MoleculeCandidate(TypedDict):
     # Métricas de docking
     docking_score: Optional[float]    # kcal/mol (más negativo = mejor)
     binding_affinity: Optional[float]
-    # Métricas ADMET
+    # Métricas ADMET básicas
     admet_toxicity: Optional[float]
     admet_solubility: Optional[str]
     admet_absorption: Optional[float]
+    # Métricas ADMET avanzadas
+    herg_risk: Optional[float]        # Riesgo cardiotóxico hERG [0-1]
+    bbb_permeability: Optional[float] # Permeabilidad barrera hematoencefálica [0-1]
+    cyp3a4_inhibition: Optional[float]# Inhibición CYP3A4 [0-1]
     # Filtros de seguridad
     pains_alert: bool
     brenk_alert: bool
     passes_lipinski: bool
-    # Dinámica Molecular (MD) Proxy
+    # Síntesis y eficiencia
+    sa_score: Optional[float]         # Synthetic accessibility [1-10]
+    ligand_efficiency: Optional[float]# LE = docking_score / heavy_atoms
+    # Dinámica Molecular / Conformacional (MMFF94 proxy)
     md_rmsd: Optional[float]
     md_refined_score: Optional[float]
+    md_strain_energy: Optional[float] # Energía strain MMFF94 [kcal/mol]
+    md_flexibility: Optional[str]     # "rigid" | "flexible" | "highly_flexible"
     # Estado
     status: str   # "generated", "filtered", "docked", "analyzed", "md_simulated", "approved", "rejected"
     score_final: Optional[float]

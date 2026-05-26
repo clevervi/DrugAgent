@@ -73,14 +73,20 @@ def run_agent_workflow():
         "Metodología de generación molecular:",
         choices=[
             "De Novo Design (Scaffold Hopping a partir de esqueletos genéricos)",
-            "Lead Optimization (Optimización y mutaciones de molécula de partida)"
+            "Lead Optimization (Optimización y mutaciones de molécula de partida)",
+            "Drug Repurposing (Semillas activas desde ChEMBL + optimización BRICS)"
         ]
     ).ask()
-    
+
     if not workflow_choice:
         return
-        
-    workflow_mode = "de_novo" if "De Novo" in workflow_choice else "lead_opt"
+
+    if "De Novo" in workflow_choice:
+        workflow_mode = "de_novo"
+    elif "Lead Optimization" in workflow_choice:
+        workflow_mode = "lead_opt"
+    else:
+        workflow_mode = "repurposing"
     parent_smiles = None
     
     if workflow_mode == "lead_opt":

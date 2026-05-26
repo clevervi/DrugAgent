@@ -118,10 +118,132 @@ oncology_pd_l1:
   receptor_path: "data/receptors/3K33_receptor.pdbqt"
   disclaimer: "ADVERTENCIA: Simulación in silico en PD-L1 (PDB 3K33). Muchos fármacos aprobados son anticuerpos; los hits aquí son small-molecule computacionales."
   docking_params:
-    center_x: 52.0
-    center_y: 14.0
-    center_z: 43.0
+    center_x: 0.0
+    center_y: 0.0
+    center_z: 0.0
     size_x: 20.0
     size_y: 20.0
     size_z: 20.0
   planner_prompt: "Design small molecules that may modulate the PD-L1 surface pocket or adjacent grooves; note assay context (protein-protein vs direct binding) when interpreting scores."
+
+# ── Nuevos targets de alta relevancia clínica ────────────────────────────────
+
+oncology_abl1:
+  display_name: "Oncología: BCR-ABL1 — Leucemia Mieloide Crónica (CML)"
+  target: "ABL1"
+  pdb_id: "1IEP"
+  receptor_path: "data/receptors/1IEP_receptor.pdbqt"
+  disclaimer: "Simulación in silico frente a ABL1 (PDB 1IEP, imatinib-bound). Los hits son candidatos computacionales; la selectividad vs kinoma requiere validación experimental."
+  docking_params:
+    center_x: 15.77
+    center_y: 36.80
+    center_z: 28.50
+    size_x: 22.0
+    size_y: 22.0
+    size_z: 22.0
+  planner_prompt: "Design type-I or type-II ABL1 kinase inhibitors; prioritize molecules that occupy the ATP binding site and the adjacent allosteric pocket, considering resistance mutations (T315I gatekeeper). Reference: imatinib, dasatinib, nilotinib pharmacophores."
+
+oncology_cdk2:
+  display_name: "Oncología: CDK2 — Ciclo Celular, Tumores Sólidos"
+  target: "CDK2"
+  pdb_id: "1FIN"
+  receptor_path: "data/receptors/1FIN_receptor.pdbqt"
+  disclaimer: "Simulación in silico frente a CDK2 (PDB 1FIN). CDK2 comparte homología con CDK1/4/6; la selectividad requiere validación secundaria."
+  docking_params:
+    center_x: 22.50
+    center_y: 23.10
+    center_z: 30.40
+    size_x: 20.0
+    size_y: 20.0
+    size_z: 20.0
+  planner_prompt: "Design CDK2 inhibitors targeting the hinge region (Glu81/Leu83); optimize selectivity over CDK4/6 by exploiting differences in the P-loop and activation loop. Prioritize molecules with H-bond to backbone NH of Leu83."
+
+oncology_braf:
+  display_name: "Oncología: BRAF V600E — Melanoma, Cáncer de Tiroides"
+  target: "BRAF"
+  pdb_id: "4MNE"
+  receptor_path: "data/receptors/4MNE_receptor.pdbqt"
+  disclaimer: "Simulación frente a BRAF V600E (PDB 4MNE, vemurafenib). La mutación V600E crea el bolsillo DFG-out; los resultados no aplican a BRAF wt sin validación adicional."
+  docking_params:
+    center_x: -7.10
+    center_y: -4.80
+    center_z: 10.50
+    size_x: 22.0
+    size_y: 22.0
+    size_z: 22.0
+  planner_prompt: "Design BRAF V600E inhibitors targeting the DFG-out inactive conformation; prioritize type-II binding mode occupying the hydrophobic back pocket. Consider paradoxical activation risk for BRAF wt and optimize for mutant selectivity."
+
+oncology_parp1:
+  display_name: "Oncología: PARP1 — Cánceres BRCA1/2 (terapia sintética letal)"
+  target: "PARP1"
+  pdb_id: "3L3M"
+  receptor_path: "data/receptors/3L3M_receptor.pdbqt"
+  disclaimer: "Simulación frente a PARP1 (PDB 3L3M). Los hits son inhibidores computacionales in silico; la selectividad vs PARP2 y trapping vs catalytic-only requieren validación."
+  docking_params:
+    center_x: 0.0
+    center_y: 0.0
+    center_z: 0.0
+    size_x: 25.0
+    size_y: 25.0
+    size_z: 25.0
+  planner_prompt: "Design PARP1 inhibitors based on NAD+ binding site pharmacophore; key interactions: H-bond to Ser904 and Gly863, stacking with Tyr907. Consider nicotinamide mimetics, benzimidazoles, and phthalazinones as established scaffolds."
+
+inflammatory_jak2:
+  display_name: "Inflamatoria/Oncológica: JAK2 — Mielofibrosis, Artritis Reumatoide"
+  target: "JAK2"
+  pdb_id: "3E64"
+  receptor_path: "data/receptors/3E64_receptor.pdbqt"
+  disclaimer: "Simulación in silico frente a JAK2 (PDB 3E64). Selectividad vs JAK1/3/TYK2 crítica para reducir efectos adversos; requiere paneles cinómicos para validación."
+  docking_params:
+    center_x: 0.0
+    center_y: 0.0
+    center_z: 0.0
+    size_x: 24.0
+    size_y: 24.0
+    size_z: 24.0
+  planner_prompt: "Design JAK2 inhibitors for the ATP binding site; prioritize selectivity over JAK3 (different cysteine) and TYK2. Key residue: Leu932 gatekeeper. Consider pyrrolo-pyrimidines and oxazino-pyridines."
+
+oncology_hdac_class1:
+  display_name: "Oncología/Epigenética: HDAC1 — Inhibidores Epigenéticos"
+  target: "HDAC1"
+  pdb_id: "4BKX"
+  receptor_path: "data/receptors/4BKX_receptor.pdbqt"
+  disclaimer: "Simulación frente a HDAC1 (PDB 4BKX). La clase I HDAC (1/2/3/8) requiere selectividad vs clase II para reducir toxicidad cardiaca; validación en panel HDAC obligatoria."
+  docking_params:
+    center_x: 0.0
+    center_y: 0.0
+    center_z: 0.0
+    size_x: 22.0
+    size_y: 22.0
+    size_z: 22.0
+  planner_prompt: "Design HDAC1 inhibitors with zinc-chelating warhead (hydroxamic acid, benzamide, or thiol); optimize selectivity for class I vs II using cap group. Key: linker geometry to reach Zn2+ and surface recognition for isoform selectivity."
+
+neuro_ache:
+  display_name: "Neurológica: AChE — Alzheimer, Deterioro Cognitivo"
+  target: "AChE"
+  pdb_id: "1EVE"
+  receptor_path: "data/receptors/1EVE_receptor.pdbqt"
+  disclaimer: "Simulación frente a AChE de Torpedo californica (PDB 1EVE, donepezil-bound). Homología alta con AChE humana. Los hits son candidatos computacionales in silico."
+  docking_params:
+    center_x: 2.30
+    center_y: 33.50
+    center_z: 50.80
+    size_x: 20.0
+    size_y: 20.0
+    size_z: 20.0
+  planner_prompt: "Design AChE inhibitors that bridge the catalytic triad (Ser200) and peripheral anionic site (Trp286); optimize for dual binding site occupancy (gorge-spanning). Reference: donepezil, rivastigmine, galantamine pharmacophores. Consider hERG risk for CNS-active compounds."
+
+infectious_hiv_integrase:
+  display_name: "Infecciosas: VIH-1 Integrasa — INSTI (Anti-VIH)"
+  target: "HIV1_INT"
+  pdb_id: "3L2T"
+  receptor_path: "data/receptors/3L2T_receptor.pdbqt"
+  disclaimer: "Simulación frente a HIV-1 Integrasa (PDB 3L2T, complejo INSTI). Los hits son inhibidores computacionales de transferencia de cadena; resistencia R263K/N155H requiere análisis adicional."
+  docking_params:
+    center_x: 0.0
+    center_y: 0.0
+    center_z: 0.0
+    size_x: 24.0
+    size_y: 24.0
+    size_z: 24.0
+  planner_prompt: "Design HIV-1 integrase strand transfer inhibitors (INSTI); key: chelate Mg2+ cofactor with diketo acid or hydroxypyrimidinone motif, displacement of 3' processed viral DNA. Reference: raltegravir, elvitegravir, dolutegravir."
